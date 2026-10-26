@@ -6,8 +6,20 @@ social accounts, plus three agents (Grow, Scout, Pitch). Product rules are in th
 
 ## Stack
 
-Next.js 15 (App Router), React 19, TypeScript. No backend yet: all data is mock data kept in the
-browser (`localStorage` key `aia-state-v1`). The agents are simulated with timers.
+Next.js 15 (App Router), React 19, TypeScript. App data is mock data kept in the browser
+(`localStorage` keys `aia-state-v1` and `aia-accounts-v1`). The screens still use simulated agents.
+
+The agents also have a real API through OpenRouter (not wired into the screens yet):
+
+- `src/server/openrouter.ts` — server-only client. Asks for JSON that matches a schema, with a timeout.
+- `src/server/agents.ts` — the Grow, Scout, Content and Pitch prompts, schemas and input checks.
+- `POST /api/agents/{grow|scout|content|pitch}` — body `{ talent, avoid?, brand?, sender? }`.
+  Errors: 400 `bad_request`, 409 `needs_account`, 503 `no_key`, 504 `timeout`, 502 `upstream` / `bad_output`.
+- `GET /api/health` — whether `OPENROUTER_API_KEY` is set, and the model.
+- `src/agency/api.ts` — typed browser helpers (`agents.grow(talent)`, …) for when the screens switch over.
+
+Environment: copy `.env.example` to `.env.local`. Keys stay on the server; never import `src/server/*`
+from a client component.
 
 ## Layout
 
