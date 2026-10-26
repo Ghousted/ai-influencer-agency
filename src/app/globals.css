@@ -1,0 +1,67 @@
+/* Base styles and keyframes from the design file. */
+
+body{margin:0;background:#FAFAFB;font-family:"Plus Jakarta Sans",sans-serif;color:#18181b;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#006AFF}a:hover{color:#0052CC}
+input,textarea,button{font-family:inherit}
+input:focus,textarea:focus{outline:2px solid #006AFF;outline-offset:1px}
+@keyframes aia-pulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes aia-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@property --foil{syntax:'<number>';initial-value:0;inherits:true}
+@keyframes rise{from{opacity:0;translate:0 90px;scale:.95}to{opacity:1;translate:0 0;scale:1}}
+@keyframes checkPop{from{opacity:0;scale:.3;rotate:-25deg}to{opacity:1;scale:1;rotate:0deg}}
+@keyframes ringPulse{0%{opacity:.8;scale:1}100%{opacity:0;scale:1.7}}
+@keyframes stepIn{from{opacity:0;translate:24px 0}to{opacity:1;translate:0 0}}
+@keyframes par{to{translate:var(--px,0px) var(--py,0px)}}
+@keyframes parFade{to{translate:0 var(--py,0px);opacity:0}}
+@keyframes parIn{from{translate:0 var(--py0,0px)}to{translate:0 var(--py1,0px)}}
+@keyframes parX{from{translate:var(--px0,0px) 0}to{translate:var(--px1,0px) 0}}
+@keyframes tiltIn{from{opacity:.3;transform:rotateX(28deg) scale(.88) translateY(40px)}to{opacity:1;transform:none}}
+@keyframes marquee{to{transform:translateX(-50%)}}
+@keyframes bob{0%,100%{translate:0 0}50%{translate:0 -12px}}
+@keyframes drift{0%,100%{translate:0 0}50%{translate:60px -40px}}
+@keyframes foil-spin{to{--angle:360deg}}
+@keyframes landFade{from{opacity:0}to{opacity:1}}
+@keyframes landDown{from{opacity:0;translate:0 -24px}to{opacity:1;translate:0 0}}
+@keyframes landUp{from{opacity:0;translate:0 36px;filter:blur(10px)}to{opacity:1;translate:0 0;filter:blur(0)}}
+@keyframes landLogo{0%{opacity:0;scale:.2;rotate:-30deg;filter:blur(12px)}60%{opacity:1;scale:1.08;rotate:5deg;filter:blur(0)}100%{opacity:1;scale:1;rotate:0deg;filter:blur(0)}}
+@keyframes landRing{from{opacity:0;scale:.4}to{opacity:1;scale:1}}
+@keyframes landPop{0%{opacity:0;scale:0;rotate:-90deg}100%{opacity:1;scale:1;rotate:0deg}}
+@keyframes landCard{from{opacity:0;translate:var(--lx,0) var(--ly,80px);scale:.55}to{opacity:1;translate:0 0;scale:1}}
+@media (prefers-reduced-motion: reduce){[data-land]{animation:none!important}}
+
+
+/* Hover states used by the hand-written shell. */
+.dc-hover-blue:hover{color:#006AFF !important}
+.dc-hover-soft:hover{background:#FAFAFB !important}
+button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px solid #006AFF;outline-offset:2px}
+
+/* Landing: small text links and the platform caption. */
+.aia-tap{min-height:40px;display:inline-flex;align-items:center}
+.aia-land-cap{text-align:center;padding:0 16px}
+.aia-land-top button{white-space:nowrap}
+
+/* Narrow screens: keep the top bar on one line. */
+@media (max-width: 720px){
+  .aia-brand,.aia-agency,.aia-chev{display:none}
+  .aia-topbar{gap:8px !important;padding:0 12px !important}
+  .aia-home{min-height:40px}
+  .aia-acct{padding:0 5px !important;gap:0 !important}
+  .aia-nav{overflow-x:auto;scrollbar-width:none;gap:2px !important;min-width:0}
+  .aia-nav::-webkit-scrollbar{display:none}
+  .aia-nav button{height:40px !important;padding:0 9px !important;font-size:13px !important;flex-shrink:0;white-space:nowrap}
+}
+
+/* Phone landing: header on one line, smaller timeline steps. */
+@media (max-width: 600px){
+  .aia-land-top{padding:18px 16px !important;gap:10px !important}
+  .aia-land-top > div:first-child{gap:8px !important;min-width:0}
+  .aia-land-logo{width:36px !important;height:36px !important;flex-shrink:0}
+  .aia-land-brand{font-size:15px !important;white-space:nowrap}
+  .aia-land-top button{padding:0 14px !important}
+  .aia-tl-slider{height:min(56vh,460px) !important;gap:32px !important}
+  .aia-tl-head{width:180px !important}
+  .aia-tl-step{width:260px !important}
+  .aia-tl-step h3{font-size:24px !important}
+}
