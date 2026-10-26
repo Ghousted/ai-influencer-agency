@@ -1,0 +1,66 @@
+/* Generated from style-hover / style-focus / style-active in the design file. */
+.dc-h0:hover{background:rgba(24,24,27,0.10) !important}
+.dc-h1:hover{background:#0052CC !important}
+.dc-h2:hover{--foil:.45 !important;transform:perspective(500px) rotateY(-13deg) rotate(-7deg) scale(1.04) !important;box-shadow:0 40px 80px rgba(24,24,27,.08),0 0 0 1px #71717A !important;z-index:3 !important}
+.dc-h3:hover{--foil:.45 !important;transform:perspective(500px) rotateY(-13deg) rotate(4deg) scale(1.04) !important;box-shadow:0 40px 80px rgba(24,24,27,.08),0 0 0 1px #71717A !important;z-index:3 !important}
+.dc-h4:hover{--foil:.45 !important;transform:perspective(500px) rotateY(-13deg) rotate(6deg) scale(1.04) !important;box-shadow:0 40px 80px rgba(24,24,27,.08),0 0 0 1px #71717A !important;z-index:3 !important}
+.dc-h5:hover{--foil:.45 !important;transform:perspective(500px) rotateY(-13deg) rotate(-4deg) scale(1.04) !important;box-shadow:0 40px 80px rgba(24,24,27,.08),0 0 0 1px #71717A !important;z-index:3 !important}
+.dc-h6:hover{--foil:.45 !important;transform:perspective(500px) rotateY(-13deg) rotate(5deg) scale(1.04) !important;box-shadow:0 40px 80px rgba(24,24,27,.08),0 0 0 1px #71717A !important;z-index:3 !important}
+.dc-h7:hover{background:#0052CC !important;transform:translateY(-2px) !important;box-shadow:none !important}
+.dc-h8:hover{color:#fff !important}
+.dc-h9:hover{color:#fff !important}
+.dc-h10:hover{background:rgba(255,255,255,.14) !important}
+.dc-h11:hover{background:rgba(255,255,255,.14) !important}
+.dc-f12:focus{border-color:#006AFF !important;box-shadow:0 0 0 3px rgba(0,106,255,.15) !important;background:#fff !important}
+.dc-f13:focus{border-color:#006AFF !important;box-shadow:0 0 0 3px rgba(0,106,255,.15) !important;background:#fff !important}
+.dc-h14:hover{background:#0052CC !important;transform:translateY(-1px) !important}
+.dc-a15:active{transform:scale(.98) !important}
+.dc-h16:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-h17:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-h18:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-h19:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-f20:focus{border-color:#006AFF !important;box-shadow:0 0 0 3px rgba(0,106,255,.15) !important;background:#fff !important}
+.dc-f21:focus{border-color:#006AFF !important;box-shadow:0 0 0 3px rgba(0,106,255,.15) !important;background:#fff !important}
+.dc-f22:focus{border-color:#006AFF !important;box-shadow:0 0 0 3px rgba(0,106,255,.15) !important;background:#fff !important}
+.dc-f23:focus{border-color:#006AFF !important;box-shadow:0 0 0 3px rgba(0,106,255,.15) !important;background:#fff !important}
+.dc-h24:hover{background:#0052CC !important;transform:translateY(-1px) !important}
+.dc-a25:active{transform:scale(.98) !important}
+.dc-h26:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-h27:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-h28:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-h29:hover{border-color:#006AFF !important;box-shadow:0 4px 12px rgba(0,106,255,.12) !important;transform:translateY(-1px) !important}
+.dc-h30:hover{background:#FAFAFB !important}
+.dc-h31:hover{background:#0052CC !important}
+.dc-h32:hover{box-shadow:0 0 0 1px #A1A1AA !important}
+.dc-h33:hover{background:#FAFAFB !important}
+.dc-h34:hover{background:#FAFAFB !important}
+.dc-h35:hover{background:#FAFAFB !important}
+.dc-h36:hover{background:#FAFAFB !important}
+.dc-h37:hover{background:#FAFAFB !important}
+.dc-h38:hover{background:#0052CC !important}
+.dc-h39:hover{transform:translateY(-2px) !important;box-shadow:0 10px 30px rgba(24,24,27,.10) !important}
+.dc-h40:hover{background:#fff !important;color:#006AFF !important}
+.dc-h41:hover{border-color:#006AFF !important}
+.dc-h42:hover{background:#0052CC !important}
+.dc-h43:hover{background:#0052CC !important}
+.dc-h44:hover{background:#0052CC !important}
+.dc-h45:hover{background:#0052CC !important}
+.dc-h46:hover{background:#ECECF1 !important}
+.dc-h47:hover{background:#FEECEC !important}
+.dc-h48:hover{background:#0052CC !important}
+.dc-h49:hover{background:#0052CC !important}
+.dc-h50:hover{background:#0052CC !important}
+.dc-h51:hover{background:#0052CC !important}
+.dc-h52:hover{background:#0052CC !important}
+.dc-h53:hover{background:#0052CC !important}
+.dc-h54:hover{background:#0052CC !important}
+.dc-h55:hover{background:#0052CC !important}
+.dc-h56:hover{background:#F2F7FF !important}
+.dc-h57:hover{background:#0052CC !important}
+.dc-h58:hover{background:#FAFAFB !important}
+.dc-h59:hover{background:#FAFAFB !important}
+.dc-h60:hover{background:#FEECEC !important}
+.dc-h61:hover{background:#0052CC !important}
+.dc-h62:hover{color:#006AFF !important}
+.dc-h63:hover{background:#FAFAFB !important}
+.dc-h64:hover{background:#FAFAFB !important}
