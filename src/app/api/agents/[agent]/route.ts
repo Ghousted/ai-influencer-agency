@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { AGENTS, parseRequest, runAgent, type AgentName } from '@/server/agents';
 import { AgentError } from '@/server/openrouter';
+import { supabaseConfigured, userFromRequest } from '@/server/supabase';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -11,6 +12,11 @@ const STATUS: Record<AgentError['code'], number> = { bad_request: 400, needs_acc
 export async function POST(req: Request, { params }: { params: Promise<{ agent: string }> }) {
   const { agent } = await params;
   if (!AGENTS.includes(agent as AgentName)) return NextResponse.json({ error: 'unknown_agent', message: `Unknown agent "${agent}".` }, { status: 404 });
+
+  // With Supabase set up, only signed-in students can spend the OpenRouter key.
+  if (supabaseConfigured() && !(await userFromRequest(req))) {
+    return NextResponse.json({ error: 'unauthorized', message: 'Please log in again.' }, { status: 401 });
+  }
 
   let body: unknown;
   try {
@@ -25,6 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ agent: 
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof AgentError) {
+      if (e.code !== 'bad_request' && e.code !== 'needs_account') console.warn(`[agents] ${agent}: ${e.code} ${e.message}`);
       return NextResponse.json({ error: e.code, message: e.message }, { status: STATUS[e.code] });
     }
     console.error('[agents]', e);

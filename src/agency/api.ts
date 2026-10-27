@@ -1,8 +1,8 @@
-// Browser-side calls to the agent API routes (src/app/api/agents). Not wired into the screens yet:
-// the app still uses the mock generators in logic.ts.
+// Browser-side calls to the agent API routes (src/app/api/agents). Sends the signed-in student's token.
+import { accessToken } from './backend';
 import type { Brand, ContentIdea, Talent } from './types';
 
-export type AgentErrorCode = 'bad_request' | 'needs_account' | 'no_key' | 'timeout' | 'upstream' | 'bad_output' | 'server' | 'network';
+export type AgentErrorCode = 'bad_request' | 'needs_account' | 'no_key' | 'timeout' | 'upstream' | 'bad_output' | 'unauthorized' | 'server' | 'network';
 
 export class AgentCallError extends Error {
   constructor(public code: AgentErrorCode, message: string) {
@@ -25,9 +25,14 @@ function talentPayload(t: Talent) {
 }
 
 async function call<T>(agent: string, body: unknown): Promise<T> {
+  const token = await accessToken();
   let res: Response;
   try {
-    res = await fetch(`/api/agents/${agent}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    res = await fetch(`/api/agents/${agent}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body),
+    });
   } catch {
     throw new AgentCallError('network', 'Could not reach the server.');
   }

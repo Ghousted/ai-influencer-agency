@@ -13,6 +13,7 @@ import { deleteSavedAccount, loadAccount, loadState, saveAccount, saveState } fr
 import * as backend from './backend';
 import { supabase } from './supabase';
 import { loadData, Syncer } from './sync';
+import { AgentCallError, agents, agentsConfigured } from './api';
 import { Shell } from './Shell';
 import { buildView } from './views';
 import { LandingScreen } from './screens/LandingScreen';
@@ -91,6 +92,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private _armReveal?: () => void;
   private _hydrated = false;
   private _sync?: Syncer;
+  /** True when the server has an OpenRouter key: signed-in students get the real agents. */
+  private _agentsOn = false;
   private _onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.state.ov) this.setState({ ov: null });
@@ -276,6 +279,45 @@ export class AgencyApp extends Component<AppProps, AppState> {
     return { loading: j.phase === 'loading', long: !!j.long && j.phase === 'loading', failed: j.phase === 'failed', stalled: j.phase === 'stalled', bad: j.phase === 'failed' || j.phase === 'stalled', phase: j.phase };
   }
 
+  /**
+   * Run an agent. Signed-in students with an OpenRouter key get the real agent through /api/agents;
+   * everyone else (local demo, ?simulate) gets the mock agent through runJob.
+   */
+  async agentJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void) {
+    const sim = this.props.simulate ?? 'normal';
+    if (!this.state.cloud || !this._agentsOn || sim !== 'normal') { this.runJob(key, mock); return; }
+    this.clearJob(key);
+    const set = (p: Partial<Job>) => this.setState((s) => ({ jobs: { ...s.jobs, [key]: { ...(s.jobs[key] || { phase: 'idle' }), ...p } } }));
+    set({ phase: 'loading', long: false });
+    this.timers[key].push(setTimeout(() => set({ long: true }), 8000));
+    try {
+      const result = await call();
+      if (this.job(key).phase !== 'loading') return;
+      this.clearJob(key);
+      apply(result);
+      set({ phase: 'done', long: false });
+    } catch (e) {
+      this.clearJob(key);
+      const code = e instanceof AgentCallError ? e.code : 'server';
+      if (code === 'no_key') { this._agentsOn = false; this.runJob(key, mock); return; }
+      if (code === 'needs_account') { set({ phase: 'done', long: false }); return; }
+      set({ phase: code === 'timeout' ? 'stalled' : 'failed', long: false });
+    }
+  }
+
+  /** New items from an agent, with fresh ids, leaving out titles the talent already has. */
+  private freshIdeas(t: Talent, list: { title: string; why: string }[]): Idea[] {
+    const used = new Set(t.ideas.map((i) => i.title.toLowerCase()));
+    let open = t.ideas.filter((i) => i.status === 'new').length;
+    const out: Idea[] = [];
+    for (const x of list) {
+      if (open >= 5 || used.has(x.title.toLowerCase())) continue;
+      out.push({ id: uid('i'), status: 'new', flagged: false, date: Date.now(), title: x.title, why: x.why });
+      open++;
+    }
+    return out;
+  }
+
   // ---- Navigation ------------------------------------------------------------
   go(route: Route, extra?: Partial<AppState> & { _saved?: boolean }) {
     this.setState((s) => {
@@ -315,6 +357,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       route: 'home', authErr: '', auth: { name: '', email: '', password: '', agency: '' },
       jobs: { ...this.state.jobs, home: { phase: 'loading', long: false } },
     });
+    agentsConfigured().then((on) => { this._agentsOn = on; });
     const data = await loadData();
     if (!data) {
       this.setState((s) => ({ jobs: { ...s.jobs, home: { phase: 'failed' } } }));
@@ -481,13 +524,25 @@ export class AgencyApp extends Component<AppProps, AppState> {
   ensure(id: string, tab: TalentTab) {
     const t = this.T(id);
     if (!t) return;
-    if (tab === 'grow' && !t.growLoaded && t.accounts.some((a) => a.mode === 'live') && this.job('grow-' + id).phase !== 'loading') this.runJob('grow-' + id, () => this.upd(id, (x) => ({ ...x, growLoaded: true })));
-    if (tab === 'content' && !t.contentLoaded && this.job('content-' + id).phase !== 'loading') this.runJob('content-' + id, () => this.upd(id, (x) => ({ ...x, contentLoaded: true, content: (x.content && x.content.length ? x.content : genContent(x).map((c, i) => ({ id: uid('c'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...c }))) })));
-    if (tab === 'scout' && !t.scoutLoaded && this.job('scout-' + id).phase !== 'loading') this.runJob('scout-' + id, () => this.upd(id, (x) => ({ ...x, scoutLoaded: true })));
+    if (tab === 'grow' && !t.growLoaded && t.accounts.some((a) => a.mode === 'live') && this.job('grow-' + id).phase !== 'loading') {
+      if (t.ideas.some((i) => i.status === 'new')) this.runJob('grow-' + id, () => this.upd(id, (x) => ({ ...x, growLoaded: true })));
+      else this.moreIdeas(id);
+    }
+    if (tab === 'content' && !t.contentLoaded && this.job('content-' + id).phase !== 'loading') {
+      if (t.content && t.content.length) this.runJob('content-' + id, () => this.upd(id, (x) => ({ ...x, contentLoaded: true })));
+      else this.moreContentIdeas(id);
+    }
+    if (tab === 'scout' && !t.scoutLoaded && this.job('scout-' + id).phase !== 'loading') this.scoutBrands(id);
   }
 
   moreIdeas(id: string) {
-    this.runJob('grow-' + id, () => this.upd(id, (t) => {
+    const t0 = this.T(id);
+    if (!t0) return;
+    this.agentJob('grow-' + id, () => agents.grow(t0), (r) => this.upd(id, (t) => {
+      const add = this.freshIdeas(t, r.ideas);
+      if (!add.length) setTimeout(() => this.toast('There are no new ideas now. Try again after your next post.'), 0);
+      return { ...t, growLoaded: true, few: r.few, ideas: add.concat(t.ideas) };
+    }), () => this.upd(id, (t) => {
       const used = new Set(t.ideas.map((i) => i.title));
       const pool = (t.few ? starterIdeas(t).concat(moreIdeas(t)) : moreIdeas(t)).filter((i) => !used.has(i.title));
       let open = t.ideas.filter((i) => i.status === 'new').length;
@@ -502,10 +557,28 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }));
   }
 
+  /** Scout: brand ideas that fit the talent. Works without a connected account. */
+  scoutBrands(id: string) {
+    const t0 = this.T(id);
+    if (!t0) return;
+    this.agentJob('scout-' + id, () => agents.scout(t0), (r) => this.upd(id, (t) => {
+      const used = new Set(t.brands.map((b) => b.name.toLowerCase()));
+      const add = r.brands.filter((b) => !used.has(b.name.toLowerCase())).map((b) => ({ id: uid('b'), flagged: false, ...b }));
+      return { ...t, scoutLoaded: true, brands: t.brands.concat(add) };
+    }), () => this.upd(id, (x) => ({ ...x, scoutLoaded: true, brands: x.brands.length ? x.brands : genBrands(x).map((b) => ({ ...b, flagged: false })) })));
+  }
+
   moreContentIdeas(id: string) {
-    this.runJob('content-' + id, () => this.upd(id, (t) => {
+    const t0 = this.T(id);
+    if (!t0) return;
+    this.agentJob('content-' + id, () => agents.content(t0), (r) => this.upd(id, (t) => {
+      const used = new Set((t.content || []).map((c) => c.title.toLowerCase()));
+      const add: ContentIdea[] = r.ideas.filter((c) => !used.has(c.title.toLowerCase())).map((c, i) => ({ id: uid('c'), status: 'new' as const, flagged: false, date: Date.now() - i * 1000, ...c }));
+      if (!add.length) setTimeout(() => this.toast('There are no new content ideas now. Try again after your next post.'), 0);
+      return { ...t, contentLoaded: true, content: add.concat(t.content || []) };
+    }), () => this.upd(id, (t) => {
       const used = new Set((t.content || []).map((c) => c.title));
-      const add: ContentIdea[] = moreContent(t).filter((c) => !used.has(c.title)).map((c) => ({ id: uid('c'), status: 'new' as const, flagged: false, date: Date.now(), ...c }));
+      const add: ContentIdea[] = (t.content && t.content.length ? moreContent(t) : genContent(t)).filter((c) => !used.has(c.title)).map((c) => ({ id: uid('c'), status: 'new' as const, flagged: false, date: Date.now(), ...c }));
       if (!add.length) setTimeout(() => this.toast('There are no new content ideas now. Try again after your next post.'), 0);
       return { ...t, contentLoaded: true, content: add.concat(t.content || []) };
     }));
@@ -583,13 +656,18 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const t = this.T(tid)!;
     const b = t.brands.find((x) => x.id === bid)!;
     const id = uid('p');
-    this.setState((s) => ({ pitches: [{ id, talentId: tid, brandId: bid, brandName: b.name, status: 'writing' as const, flagged: false, date: Date.now(), pitch: '', profile: '' }, ...s.pitches] }));
+    // Write once the new pitch is in state: writePitch reads it from there.
+    this.setState((s) => ({ pitches: [{ id, talentId: tid, brandId: bid, brandName: b.name, status: 'writing' as const, flagged: false, date: Date.now(), pitch: '', profile: '' }, ...s.pitches] }), () => this.writePitch(id));
     this.go('pitch', { pitchId: id });
-    this.writePitch(id);
   }
 
   writePitch(id: string) {
-    this.runJob('pitch-' + id, () => this.setState((s) => ({
+    const p0 = this.state.pitches.find((x) => x.id === id);
+    const t0 = p0 && this.T(p0.talentId);
+    const b0 = t0 && t0.brands.find((x) => x.id === p0!.brandId);
+    if (!p0 || !t0 || !b0) return;
+    const sender = { name: this.state.user.name, agency: this.state.agencyName };
+    this.agentJob('pitch-' + id, () => agents.pitch(t0, b0, sender), (r) => this.updPitch(id, { pitch: r.pitch, profile: r.profile, status: 'draft', date: Date.now() }), () => this.setState((s) => ({
       pitches: s.pitches.map((p) => {
         if (p.id !== id) return p;
         const t = s.talents.find((x) => x.id === p.talentId)!;
@@ -799,7 +877,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }
     const fAccs = Object.entries<any>(f.accs || {}).filter(([, a]) => a.phase === 'on').map(([platform, a]) => ({ id: uid('a'), platform: platform as any, handle: a.handle, mode: 'live' as const, status: 'ok' as const, updated: 0 }));
     const t: Talent = { id: uid('t'), name: f.name.trim(), niche: f.niche.trim(), story: f.story.trim(), pic: f.pic, color: f.color || this.nextColor(), tint: TINTS[this.state.talents.length % TINTS.length], accounts: fAccs, stats: fAccs.length ? { posts: [6, 4], views: [5200, 4100], eng: [6.1, 5.5], time: [40, 31], taken: MONTHS[new Date().getMonth()] + ' ' + new Date().getDate() } : null, ideas: [], brands: [], few: true, growLoaded: false, scoutLoaded: false };
-    t.brands = genBrands(t).map((b) => ({ ...b, flagged: false }));
+    // Signed in with real agents: Scout writes the brand ideas when the Scout tab opens.
+    t.brands = this.state.cloud && this._agentsOn ? [] : genBrands(t).map((b) => ({ ...b, flagged: false }));
     if (fAccs.length) t.ideas = starterIdeas(t).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
     this.setState((s) => ({ talents: s.talents.concat([t]), draft: null }));
     this.go('talent', { talentId: t.id, tab: 'overview', _saved: true, draft: null });
