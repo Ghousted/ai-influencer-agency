@@ -1,6 +1,6 @@
 import { createRef, type RefObject } from 'react';
 import type { AgencyApp } from '../AgencyApp';
-import { LOGO, PLATFORMS, dlong, first, genBrands, genPrompt, parseYmd, tstr } from '../logic';
+import { LOGO, PLATFORMS, dlong, first, genPrompt, parseYmd, tstr } from '../logic';
 import type { Account, ContentIdea, PitchStatus, Talent, TalentTab } from '../types';
 
 const TABS: [string, TalentTab][] = [['Overview', 'overview'], ['Accounts', 'accounts'], ['Grow', 'grow'], ['Content', 'content'], ['Scout', 'scout']];
@@ -158,10 +158,7 @@ function scoutView(app: AgencyApp, t: Talent) {
   return {
     loading: j.loading, long: j.long, bad: j.bad, stalled: j.stalled,
     // ensure() does nothing once Scout has loaded, so Try again runs the job and fills an empty list.
-    retry: () => app.runJob('scout-' + t.id, () => app.upd(t.id, (x) => ({
-      ...x, scoutLoaded: true,
-      brands: x.brands.length ? x.brands : genBrands(x).map((b) => ({ ...b, flagged: false })),
-    }))),
+    retry: () => app.scoutBrands(t.id),
     empty: idle && t.brands.length === 0,
     ready: idle && t.brands.length > 0,
     brands: t.brands.map((b) => {
