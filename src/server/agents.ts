@@ -172,7 +172,7 @@ export async function runAgent(agent: AgentName, req: AgentRequest) {
       const out = await chatJson<Pitch>({
         name: 'pitch_draft',
         schema: PITCH_SCHEMA,
-        temperature: 0.5,
+        maxTokens: 1200,
         system: `${VOICE} You are the Pitch agent. You draft a short sponsorship pitch from the student to a brand, plus a one-paragraph talent profile. The student edits, approves and sends it themselves. ${s ? 'Use the numbers given, exactly.' : 'No account is connected: leave all numbers out. Do not invent numbers.'}`,
         user: `${describe(t)}\n\nBrand: ${b.name} — ${b.what}.\nWhy it fits: ${b.why}\nWhere to approach: ${b.where}\n\nWrite the pitch as "Hi ${b.name} team," and sign it as:\n${req.sender!.name}\n${req.sender!.agency}\nAsk for a short call about a sponsored post. Keep it under 150 words.`,
       });
