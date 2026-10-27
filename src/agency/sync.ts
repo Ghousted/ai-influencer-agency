@@ -31,7 +31,7 @@ export class Syncer {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private running: Promise<void> = Promise.resolve();
 
-  constructor(start: CloudData & { draft?: unknown }, private onError: (message: string) => void) {
+  constructor(start: CloudData & { draft?: unknown }, private onError: (message: string) => void, private onSaved?: () => void) {
     this.saved = { talents: byId(start.talents), pitches: byId(start.pitches), posts: byId(start.posts), draft: JSON.stringify(start.draft ?? null) };
   }
 
@@ -88,7 +88,9 @@ export class Syncer {
     } catch {
       // Keep the old snapshot, so the next change tries these rows again.
       this.onError('The app could not save your last change. It will try again with your next change.');
+      return;
     }
+    this.onSaved?.();
   }
 }
 
