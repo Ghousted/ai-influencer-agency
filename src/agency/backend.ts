@@ -1,6 +1,6 @@
 // Supabase calls for sign-in and the agency row. Every function returns a plain result the
 // app can show; errors become short messages in the product's voice.
-import { supabase } from './supabase';
+import { BUCKET, supabase } from './supabase';
 
 export type Profile = { userId: string; email: string; name: string; agencyName: string; draft: unknown; settings: Record<string, unknown> };
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -98,4 +98,32 @@ export async function deleteAccount(): Promise<Result<null>> {
   if (!res || !res.ok) return fail('The app cannot delete your account now. Try again.');
   await signOut();
   return { ok: true, data: null };
+}
+
+// ---- Talent pictures ------------------------------------------------------------
+// Pictures go to the storage bucket under <user_id>/. Talents keep only the public URL.
+
+const PUBLIC_PREFIX = `/storage/v1/object/public/${BUCKET}/`;
+
+/** Upload a picture given as a data URL (the form resizes it to 512px JPEG first). Returns its public URL. */
+export async function uploadPicture(dataUrl: string): Promise<Result<string>> {
+  const sb = supabase();
+  if (!sb) return fail('Pictures need an account. Log in first.');
+  const { data } = await sb.auth.getUser();
+  if (!data.user) return fail('Please log in again.');
+  const blob = await fetch(dataUrl).then((r) => r.blob()).catch(() => null);
+  if (!blob) return fail('The app cannot read this picture.');
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+  const path = `${data.user.id}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg', cacheControl: '31536000', upsert: false });
+  if (error) return fail('The app cannot upload the picture. Try again.');
+  return { ok: true, data: sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl };
+}
+
+/** Remove a picture this app uploaded. Other URLs (demo images, data URLs) are left alone. */
+export async function removePicture(url: string | null | undefined) {
+  const sb = supabase();
+  const i = url ? url.indexOf(PUBLIC_PREFIX) : -1;
+  if (!sb || !url || i < 0) return;
+  await sb.storage.from(BUCKET).remove([decodeURIComponent(url.slice(i + PUBLIC_PREFIX.length))]);
 }
