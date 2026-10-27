@@ -12,6 +12,7 @@ import type { ContentIdea, Idea, Job, Pitch, Route, ScheduledPost, Simulate, Tal
 import { deleteSavedAccount, loadAccount, loadState, saveAccount, saveState } from './persist';
 import * as backend from './backend';
 import { supabase } from './supabase';
+import { loadData, Syncer } from './sync';
 import { Shell } from './Shell';
 import { buildView } from './views';
 import { LandingScreen } from './screens/LandingScreen';
@@ -89,6 +90,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private _revealIO?: IntersectionObserver;
   private _armReveal?: () => void;
   private _hydrated = false;
+  private _sync?: Syncer;
   private _onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.state.ov) this.setState({ ov: null });
@@ -162,8 +164,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this._armReveal?.();
     if (!this._hydrated) return;
     if (this.state.cloud) {
-      // Until talents, pitches and posts move to the database, keep them in this browser for this student.
-      if (this.state.signedIn) saveAccount(this.state.user.email, this.withDraft(this.state), ACCOUNT_KEYS);
+      const s = this.withDraft(this.state);
+      this._sync?.schedule({ talents: s.talents, pitches: s.pitches, posts: s.posts, draft: s.draft });
     } else {
       saveState(this.withDraft(this.state), PERSISTED);
     }
@@ -303,17 +305,39 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.runJob('home');
   }
 
-  /** Open the signed-in student's agency after a Supabase sign-in. */
-  enterCloud(p: backend.Profile) {
-    const local = loadAccount(p.email) as Partial<AppState> | null;
+  /** Open the signed-in student's agency after a Supabase sign-in, and load it from the database. */
+  async enterCloud(p: backend.Profile) {
+    this._sync = undefined;
     this.setState({
       signedIn: true, cloud: true, userId: p.userId, authBusy: false,
       user: { name: p.name, email: p.email }, agencyName: p.agencyName,
-      talents: (local?.talents as Talent[]) || [], pitches: (local?.pitches as Pitch[]) || [], posts: (local?.posts as ScheduledPost[]) || [],
-      draft: p.draft || local?.draft || null,
+      talents: [], pitches: [], posts: [], draft: p.draft || null,
       route: 'home', authErr: '', auth: { name: '', email: '', password: '', agency: '' },
+      jobs: { ...this.state.jobs, home: { phase: 'loading', long: false } },
     });
-    this.runJob('home');
+    const data = await loadData();
+    if (!data) {
+      this.setState((s) => ({ jobs: { ...s.jobs, home: { phase: 'failed' } } }));
+      return;
+    }
+    // One-time import: an agency made in this browser before sign-in moves into the database.
+    const local = loadAccount(p.email) as Partial<AppState> | null;
+    const importLocal = !data.talents.length && !!local?.talents?.length;
+    const start = importLocal
+      ? { talents: local!.talents as Talent[], pitches: (local!.pitches as Pitch[]) || [], posts: (local!.posts as ScheduledPost[]) || [] }
+      : data;
+    this._sync = new Syncer(importLocal ? { talents: [], pitches: [], posts: [], draft: null } : { ...data, draft: p.draft }, (m) => this.toast(m));
+    this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }));
+    if (importLocal) {
+      deleteSavedAccount(p.email);
+      this.toast('Your AI talents from this browser are now saved to your account.');
+    }
+  }
+
+  /** Home "Try again": reload the agency from the database, or rerun the demo load. */
+  retryHome() {
+    if (!this.state.cloud) { this.runJob('home'); return; }
+    backend.currentProfile().then((p) => (p ? this.enterCloud(p) : this.logOut(false)));
   }
 
   async submitLogin() {
@@ -359,14 +383,21 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   logOut(keepAccount = true) {
     Object.keys(this.timers).forEach((k) => this.clearJob(k));
-    if (keepAccount && this.state.signedIn) saveAccount(this.state.user.email, this.withDraft(this.state), ACCOUNT_KEYS);
-    if (this.state.cloud) backend.signOut();
+    if (this.state.cloud) {
+      // Save anything still waiting, then end the session.
+      const pending = keepAccount && this._sync ? this._sync.flush() : Promise.resolve();
+      this._sync = undefined;
+      pending.finally(() => backend.signOut());
+    } else if (keepAccount && this.state.signedIn) {
+      saveAccount(this.state.user.email, this.withDraft(this.state), ACCOUNT_KEYS);
+    }
     this.setState({ signedIn: false, cloud: false, userId: null, authBusy: false, route: 'start', user: { name: 'Mika Santos', email: 'mika.santos@email.com' }, agencyName: "Mika's Talent House", talents: [], pitches: [], posts: [], draft: null, form: null, ov: null, acctMenu: false, jobs: {}, ui: {}, renameVal: '', editedAfterApprove: false, histTab: 'all', calMonth: null, calSel: null, calFilter: null });
   }
   /** Delete the agency and everything in it, then log out. */
   async deleteAccount() {
     const email = this.state.user.email;
     if (this.state.cloud) {
+      this._sync = undefined;
       const r = await backend.deleteAccount();
       if (!r.ok) { this.toast(r.error); return; }
     }
