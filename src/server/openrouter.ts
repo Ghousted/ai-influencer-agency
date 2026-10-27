@@ -29,11 +29,12 @@ type ChatJsonArgs = {
   user: string;
   /** JSON Schema for the answer. Strict mode: every object needs additionalProperties: false. */
   schema: Record<string, unknown>;
-  temperature?: number;
+  /** Upper bound on the answer length, to cap the cost of one call. */
+  maxTokens?: number;
 };
 
 /** Ask the model for a JSON answer that matches `schema`, and parse it. */
-export async function chatJson<T>({ name, system, user, schema, temperature = 0.7 }: ChatJsonArgs): Promise<T> {
+export async function chatJson<T>({ name, system, user, schema, maxTokens = 2500 }: ChatJsonArgs): Promise<T> {
   const cfg = openRouterConfig();
   if (!cfg.key) throw new AgentError('no_key', 'OPENROUTER_API_KEY is not set.');
 
@@ -52,7 +53,9 @@ export async function chatJson<T>({ name, system, user, schema, temperature = 0.
       },
       body: JSON.stringify({
         model: cfg.model,
-        temperature,
+        // No temperature: newer Claude models on OpenRouter do not accept it, and with
+        // require_parameters an unsupported parameter rules out every provider.
+        max_tokens: maxTokens,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
