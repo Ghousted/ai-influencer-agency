@@ -327,10 +327,19 @@ export class AgencyApp extends Component<AppProps, AppState> {
       ? { talents: local!.talents as Talent[], pitches: (local!.pitches as Pitch[]) || [], posts: (local!.posts as ScheduledPost[]) || [] }
       : data;
     this._sync = new Syncer(importLocal ? { talents: [], pitches: [], posts: [], draft: null } : { ...data, draft: p.draft }, (m) => this.toast(m));
-    this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }));
+    this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }), () => this.movePicturesToStorage());
     if (importLocal) {
       deleteSavedAccount(p.email);
       this.toast('Your AI talents from this browser are now saved to your account.');
+    }
+  }
+
+  /** Older talents kept their picture inline. Move each one to the storage bucket once. */
+  async movePicturesToStorage() {
+    for (const t of this.state.talents) {
+      if (!t.pic || !t.pic.startsWith('data:')) continue;
+      const r = await backend.uploadPicture(t.pic);
+      if (r.ok) this.upd(t.id, (x) => (x.pic === t.pic ? { ...x, pic: r.data } : x));
     }
   }
 
@@ -696,6 +705,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const id = this.state.ov.tid;
     const t = this.T(id)!;
     this.setState((s) => ({ talents: s.talents.filter((x) => x.id !== id), pitches: s.pitches.filter((p) => p.talentId !== id), posts: s.posts.filter((p) => p.talentId !== id), ov: null }));
+    if (this.state.cloud) backend.removePicture(t.pic);
     this.go('talents');
     this.toast(t.name + ' was deleted.');
   }
@@ -763,10 +773,22 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   setForm(k: string, v: any) { this.setState((s) => ({ form: { ...s.form, [k]: v } })); }
 
-  saveForm() {
-    const f = this.state.form;
+  async saveForm() {
+    if (this.state.ui.formSaving) return;
+    let f = this.state.form;
+    // Signed in: the picture goes to the storage bucket, and the talent keeps only its URL.
+    if (this.state.cloud && typeof f.pic === 'string' && f.pic.startsWith('data:')) {
+      this.setUi({ formSaving: true });
+      this.toast('Uploading the picture…');
+      const r = await backend.uploadPicture(f.pic);
+      this.setUi({ formSaving: false });
+      if (!r.ok) { this.toast(r.error); return; }
+      f = { ...f, pic: r.data };
+    }
     if (f.mode === 'edit') {
+      const oldPic = this.T(f.id)?.pic;
       this.upd(f.id, (t) => ({ ...t, name: f.name.trim(), niche: f.niche.trim(), story: f.story.trim(), pic: f.pic, color: f.color || t.color }));
+      if (this.state.cloud && oldPic && oldPic !== f.pic) backend.removePicture(oldPic);
       this.go('talent', { talentId: f.id, _saved: true });
       this.toast('Saved.');
       return;
