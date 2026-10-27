@@ -6,8 +6,31 @@ social accounts, plus three agents (Grow, Scout, Pitch). Product rules are in th
 
 ## Stack
 
-Next.js 15 (App Router), React 19, TypeScript. No backend yet: all data is mock data kept in the
-browser (`localStorage` key `aia-state-v1`). The agents are simulated with timers.
+Next.js 15 (App Router), React 19, TypeScript. App data is mock data kept in the browser
+(`localStorage` keys `aia-state-v1` and `aia-accounts-v1`). The screens still use simulated agents.
+
+The agents also have a real API through OpenRouter (not wired into the screens yet):
+
+- `src/server/openrouter.ts` — server-only client. Asks for JSON that matches a schema, with a timeout.
+- `src/server/agents.ts` — the Grow, Scout, Content and Pitch prompts, schemas and input checks.
+- `POST /api/agents/{grow|scout|content|pitch}` — body `{ talent, avoid?, brand?, sender? }`.
+  Errors: 400 `bad_request`, 409 `needs_account`, 503 `no_key`, 504 `timeout`, 502 `upstream` / `bad_output`.
+- `GET /api/health` — whether `OPENROUTER_API_KEY` is set, and the model.
+- `src/agency/api.ts` — typed browser helpers (`agents.grow(talent)`, …) for when the screens switch over.
+
+Supabase is the backend for sign-in, data and pictures:
+
+- `supabase/migrations/*.sql` — schema. Apply with `npm run db:migrate` (reads `.env.local`, verifies TLS
+  with `certs/supabase-ca.crt`). Never edit an applied migration; add a new numbered file.
+- Tables `agencies`, `talents`, `pitches`, `posts`, one row set per student (`user_id`). Talents, pitches
+  and posts keep the app's shape in a `data` jsonb column, so `src/agency/types.ts` stays the source of truth.
+- Row-level security on every table: a student only reads and writes their own rows. Pictures go in the
+  storage bucket under `<user_id>/`.
+- `src/agency/supabase.ts` — browser client (publishable key). `src/server/supabase.ts` — admin client
+  (secret key) and `userFromRequest` for API routes. Never import `src/server/*` from client code.
+
+Environment: copy `.env.example` to `.env.local`. Keys stay on the server; never import `src/server/*`
+from a client component.
 
 ## Layout
 
