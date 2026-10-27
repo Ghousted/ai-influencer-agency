@@ -10,6 +10,8 @@ import {
 } from './logic';
 import type { ContentIdea, Idea, Job, Pitch, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
 import { deleteSavedAccount, loadAccount, loadState, saveAccount, saveState } from './persist';
+import * as backend from './backend';
+import { supabase } from './supabase';
 import { Shell } from './Shell';
 import { buildView } from './views';
 import { LandingScreen } from './screens/LandingScreen';
@@ -62,6 +64,10 @@ export type AppState = {
   homeHidden?: Record<string, boolean>;
   /** Free-form UI state used by individual screens. */
   ui: Record<string, any>;
+  /** Signed in through Supabase (not the local demo). */
+  cloud?: boolean;
+  userId?: string | null;
+  authBusy?: boolean;
 };
 
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
@@ -132,19 +138,35 @@ export class AgencyApp extends Component<AppProps, AppState> {
     };
     setTimeout(this._armReveal, 50);
 
-    const saved = loadState(PERSISTED);
-    if (saved && saved.signedIn) {
-      this.setState({ ...saved, route: 'home' } as AppState, () => { this._hydrated = true; });
-      this.runJob('home');
-    } else {
+    const demo = (this.props.startAt ?? 'Start page') === 'Signed in';
+    if (demo) {
       this._hydrated = true;
-      if ((this.props.startAt ?? 'Start page') === 'Signed in') this.login();
+      this.login();
+    } else if (supabase()) {
+      backend.currentProfile().then((p) => {
+        this._hydrated = true;
+        if (p) this.enterCloud(p);
+      });
+    } else {
+      const saved = loadState(PERSISTED);
+      if (saved && saved.signedIn) {
+        this.setState({ ...saved, route: 'home' } as AppState, () => { this._hydrated = true; });
+        this.runJob('home');
+      } else {
+        this._hydrated = true;
+      }
     }
   }
 
   componentDidUpdate() {
     this._armReveal?.();
-    if (this._hydrated) saveState(this.withDraft(this.state), PERSISTED);
+    if (!this._hydrated) return;
+    if (this.state.cloud) {
+      // Until talents, pitches and posts move to the database, keep them in this browser for this student.
+      if (this.state.signedIn) saveAccount(this.state.user.email, this.withDraft(this.state), ACCOUNT_KEYS);
+    } else {
+      saveState(this.withDraft(this.state), PERSISTED);
+    }
   }
 
   componentWillUnmount() {
@@ -281,9 +303,30 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.runJob('home');
   }
 
-  submitLogin() {
+  /** Open the signed-in student's agency after a Supabase sign-in. */
+  enterCloud(p: backend.Profile) {
+    const local = loadAccount(p.email) as Partial<AppState> | null;
+    this.setState({
+      signedIn: true, cloud: true, userId: p.userId, authBusy: false,
+      user: { name: p.name, email: p.email }, agencyName: p.agencyName,
+      talents: (local?.talents as Talent[]) || [], pitches: (local?.pitches as Pitch[]) || [], posts: (local?.posts as ScheduledPost[]) || [],
+      draft: p.draft || local?.draft || null,
+      route: 'home', authErr: '', auth: { name: '', email: '', password: '', agency: '' },
+    });
+    this.runJob('home');
+  }
+
+  async submitLogin() {
     const a = this.state.auth;
     if (!a.email.trim() || !a.password.trim()) { this.setState({ authErr: 'Please fill in your email and password.' }); return; }
+    if (supabase()) {
+      if (this.state.authBusy) return;
+      this.setState({ authBusy: true, authErr: '' });
+      const r = await backend.signIn(a.email.trim(), a.password);
+      if (!r.ok) { this.setState({ authBusy: false, authErr: r.error }); return; }
+      this.enterCloud(r.data);
+      return;
+    }
     // Mock auth: an agency made in this browser comes back for the same email. Any other email opens the demo.
     const acc = loadAccount(a.email);
     if (acc) {
@@ -294,22 +337,80 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.login();
   }
 
-  signup() {
+  async signup() {
     const a = this.state.auth;
     if (!a.name.trim() || !a.email.trim() || !a.password.trim() || !a.agency.trim()) { this.setState({ authErr: 'Please fill in all four fields.' }); return; }
     if (a.password.length < 8) { this.setState({ authErr: 'Your password must have 8 characters or more.' }); return; }
+    if (supabase()) {
+      if (this.state.authBusy) return;
+      this.setState({ authBusy: true, authErr: '' });
+      const r = await backend.signUp({ name: a.name.trim(), email: a.email.trim(), password: a.password, agency: a.agency.trim() });
+      if (!r.ok) { this.setState({ authBusy: false, authErr: r.error }); return; }
+      if (r.data === 'confirm') {
+        this.setState({ authBusy: false, route: 'login', auth: { ...a, password: '' }, authErr: '' });
+        this.toast('Check your email and click the link to confirm. Then log in.');
+        return;
+      }
+      this.enterCloud(r.data);
+      return;
+    }
     this.setState({ signedIn: true, user: { name: a.name.trim(), email: a.email.trim() }, agencyName: a.agency.trim(), talents: [], posts: [], pitches: [], route: 'home', authErr: '', draft: null, auth: { name: '', email: '', password: '', agency: '' } });
   }
 
   logOut(keepAccount = true) {
     Object.keys(this.timers).forEach((k) => this.clearJob(k));
     if (keepAccount && this.state.signedIn) saveAccount(this.state.user.email, this.withDraft(this.state), ACCOUNT_KEYS);
-    this.setState({ signedIn: false, route: 'start', user: { name: 'Mika Santos', email: 'mika.santos@email.com' }, agencyName: "Mika's Talent House", talents: [], pitches: [], posts: [], draft: null, form: null, ov: null, acctMenu: false, jobs: {}, ui: {}, renameVal: '', editedAfterApprove: false, histTab: 'all', calMonth: null, calSel: null, calFilter: null });
+    if (this.state.cloud) backend.signOut();
+    this.setState({ signedIn: false, cloud: false, userId: null, authBusy: false, route: 'start', user: { name: 'Mika Santos', email: 'mika.santos@email.com' }, agencyName: "Mika's Talent House", talents: [], pitches: [], posts: [], draft: null, form: null, ov: null, acctMenu: false, jobs: {}, ui: {}, renameVal: '', editedAfterApprove: false, histTab: 'all', calMonth: null, calSel: null, calFilter: null });
   }
-  /** Delete the agency and everything in it from this browser, then log out. */
-  deleteAccount() {
-    deleteSavedAccount(this.state.user.email);
+  /** Delete the agency and everything in it, then log out. */
+  async deleteAccount() {
+    const email = this.state.user.email;
+    if (this.state.cloud) {
+      const r = await backend.deleteAccount();
+      if (!r.ok) { this.toast(r.error); return; }
+    }
+    deleteSavedAccount(email);
     this.logOut(false);
+    this.toast('Your account was deleted.');
+  }
+
+  async saveProfile(name: string, email: string) {
+    const emailChanged = email.toLowerCase() !== this.state.user.email.toLowerCase();
+    if (this.state.cloud) {
+      const r = await backend.updateAgency({ owner_name: name });
+      if (!r.ok) { this.toast(r.error); return false; }
+      if (emailChanged) {
+        const e = await backend.updateEmail(email);
+        if (!e.ok) { this.toast(e.error); return false; }
+        this.setState((s) => ({ user: { ...s.user, name } }));
+        this.toast('Saved. Check your new email and click the link to finish the change.');
+        return true;
+      }
+    }
+    this.setState({ user: { name, email } });
+    this.toast('Saved.');
+    return true;
+  }
+
+  async renameAgency(name: string) {
+    if (this.state.cloud) {
+      const r = await backend.updateAgency({ name });
+      if (!r.ok) { this.toast(r.error); return false; }
+    }
+    this.setState({ agencyName: name, renameVal: '' });
+    this.toast('Agency renamed.');
+    return true;
+  }
+
+  /** Returns an error message, or null when the password changed. */
+  async changePassword(current: string, next: string): Promise<string | null> {
+    if (this.state.cloud) {
+      const r = await backend.changePassword(this.state.user.email, current, next);
+      if (!r.ok) return r.error;
+    }
+    this.toast('Password changed.');
+    return null;
   }
 
   /** While a new talent is being written, keep it as the draft so a reload can resume it. */
