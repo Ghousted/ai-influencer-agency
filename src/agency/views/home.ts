@@ -208,7 +208,7 @@ export function homeView(app: AgencyApp) {
 
   const home = {
     loading: hj.loading, long: hj.long, bad: hj.bad,
-    retry: () => app.runJob('home'),
+    retry: () => app.retryHome(),
     empty: !hj.loading && !hj.bad && !T.length,
     ready: !hj.loading && !hj.bad && T.length > 0,
     count: T.length + ' AI talent' + (T.length === 1 ? '' : 's'),
