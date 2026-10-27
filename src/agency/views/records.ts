@@ -192,9 +192,7 @@ export function accountView(app: AgencyApp) {
         const name = nameV.trim(), email = emailV.trim();
         if (!name || !email) { app.toast('Please fill in your name and email.'); return; }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { app.toast('Please type a correct email.'); return; }
-        app.setState({ user: { name, email } });
-        app.setUi({ acctName: undefined, acctEmail: undefined });
-        app.toast('Saved.');
+        app.saveProfile(name, email).then((ok) => { if (ok) app.setUi({ acctName: undefined, acctEmail: undefined }); });
       },
 
       val: ui.renameOn ? s.renameVal : s.agencyName,
@@ -202,9 +200,7 @@ export function accountView(app: AgencyApp) {
       save: () => {
         const v = (ui.renameOn ? s.renameVal : s.agencyName).trim();
         if (!v) { app.toast('Please type a name for your agency.'); return; }
-        app.setState({ agencyName: v, renameVal: '' });
-        app.setUi({ renameOn: false });
-        app.toast('Agency renamed.');
+        app.renameAgency(v).then((ok) => { if (ok) app.setUi({ renameOn: false }); });
       },
 
       pw0: ui.pw0 || '', pw1: ui.pw1 || '',
@@ -216,8 +212,7 @@ export function accountView(app: AgencyApp) {
         if (!a.trim()) { app.setUi({ pwErr: 'Please type your current password.' }); return; }
         if (b.length < 8) { app.setUi({ pwErr: 'Your new password must have 8 characters or more.' }); return; }
         if (a === b) { app.setUi({ pwErr: 'Your new password must be different.' }); return; }
-        app.setUi({ pw0: '', pw1: '', pwErr: '' });
-        app.toast('Password changed.');
+        app.changePassword(a, b).then((err) => app.setUi(err ? { pwErr: err } : { pw0: '', pw1: '', pwErr: '' }));
       },
 
       accs,

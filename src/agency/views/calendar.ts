@@ -255,9 +255,9 @@ export function overlaysView(app: AgencyApp) {
         btn: 'Delete account',
       };
       ovl.delAcct = () => {
+        // deleteAccount shows the result: "Your account was deleted." or why it failed.
+        app.setState({ ov: null });
         app.deleteAccount();
-        app.setState({ user: { name: '', email: '' }, agencyName: '' });
-        app.toast('Your account was deleted.');
       };
     }
   }
