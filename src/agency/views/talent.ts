@@ -48,7 +48,7 @@ function accountRows(app: AgencyApp, t: Talent) {
     const busy = app.jv('refresh-' + a.id).loading;
     const sub = a.mode === 'handle' ? 'Numbers not available. Added by handle.'
       : lost ? 'Connection lost. Last good numbers from ' + (taken || 'the last read') + '.'
-        : busy ? 'Reading the numbers…' : ago(a.updated || 0);
+        : busy ? 'Reading the numbers…' : ago(a.readAt ? Math.floor((Date.now() - a.readAt) / 60000) : a.updated || 0);
     return {
       handle: a.handle, sub, subColor: lost ? '#B91C1C' : '#71717a',
       canRefresh: a.mode === 'live' && !lost && !busy,

@@ -1,8 +1,10 @@
-// Browser-side calls to the agent API routes (src/app/api/agents). Sends the signed-in student's token.
+// Browser-side calls to the agent and account API routes (src/app/api). Sends the signed-in student's token.
 import { accessToken } from './backend';
-import type { Brand, ContentIdea, Talent } from './types';
+import type { AccountStats, Brand, ContentIdea, Platform, Talent } from './types';
 
-export type AgentErrorCode = 'bad_request' | 'needs_account' | 'no_key' | 'timeout' | 'upstream' | 'bad_output' | 'unauthorized' | 'server' | 'network';
+export type AgentErrorCode =
+  | 'bad_request' | 'needs_account' | 'no_key' | 'timeout' | 'upstream' | 'bad_output'
+  | 'not_found' | 'not_configured' | 'unauthorized' | 'server' | 'network';
 
 export class AgentCallError extends Error {
   constructor(public code: AgentErrorCode, message: string) {
@@ -24,11 +26,11 @@ function talentPayload(t: Talent) {
   };
 }
 
-async function call<T>(agent: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown): Promise<T> {
   const token = await accessToken();
   let res: Response;
   try {
-    res = await fetch(`/api/agents/${agent}`, {
+    res = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(body),
@@ -40,6 +42,8 @@ async function call<T>(agent: string, body: unknown): Promise<T> {
   if (!res.ok) throw new AgentCallError(data.error || 'server', data.message || `Request failed (${res.status}).`);
   return data as T;
 }
+
+const call = <T>(agent: string, body: unknown) => post<T>(`/api/agents/${agent}`, body);
 
 export const agents = {
   /** 3 to 5 growth ideas tied to the talent's numbers. Fails with `needs_account` when no account shares numbers. */
@@ -70,6 +74,16 @@ export const agents = {
       brand: { name: b.name, what: b.what, why: b.why, where: b.where },
       sender,
     }),
+};
+
+export type AccountRead = { handle: string; ref: string; stats: AccountStats; few: boolean };
+
+export const accounts = {
+  /**
+   * Read one account's numbers. The first read finds it by handle; later reads pass the `ref` it returned.
+   * Fails with `not_configured` for a platform the server cannot read yet, and `not_found` when no account has that handle.
+   */
+  read: (platform: Platform, by: { handle?: string; ref?: string }) => post<AccountRead>('/api/accounts/read', { platform, ...by }),
 };
 
 /** Whether the server has an OpenRouter key. */

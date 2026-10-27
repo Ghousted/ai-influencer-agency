@@ -7,8 +7,14 @@ export type Account = {
   /** live: numbers are read from the platform. handle: added by handle only, no numbers. */
   mode: 'live' | 'handle';
   status: 'ok' | 'lost';
-  /** Minutes since the numbers were last read. */
+  /** Minutes since the numbers were last read (simulated accounts). */
   updated?: number;
+  /** The platform's own id for the account, e.g. a YouTube channel id. Set once it is read for real. */
+  ref?: string;
+  /** When the numbers were last read for real (ms). */
+  readAt?: number;
+  /** This account's own numbers from its last real read. The talent's stats add these up. */
+  stats?: AccountStats;
 };
 
 /** [this week, last week] */
@@ -23,6 +29,9 @@ export type Stats = {
   timeBy?: string;
   taken: string;
 };
+
+/** One account's numbers, as the server reads them. */
+export type AccountStats = Pick<Stats, 'posts' | 'views' | 'eng' | 'time'>;
 
 export type ItemStatus = 'new' | 'done' | 'dismissed';
 

@@ -169,18 +169,20 @@ export function overlaysView(app: AgencyApp) {
       // Reconnect failed: keep the account, but read it by handle only.
       if (h[0] !== '@') h = '@' + h;
       app.clearJob('connect');
-      app.upd(o.tid, (x) => {
-        const accounts = x.accounts.map((a) => (a.id === o.reId ? { ...a, handle: h, mode: 'handle' as const, status: 'ok' as const, updated: undefined } : a));
-        return { ...x, accounts, stats: accounts.some((a) => a.mode === 'live') ? x.stats : null };
-      });
+      app.upd(o.tid, (x) => app.withAccounts(x, x.accounts.map((a) => (a.id === o.reId ? { ...a, handle: h, mode: 'handle' as const, status: 'ok' as const, updated: undefined, ref: undefined, readAt: undefined, stats: undefined } : a))));
       app.setState({ ov: null });
       app.toast(o.platform + ' added by handle.');
     };
+    // Signed in, YouTube is read by its handle, so the handle goes in before Connect.
+    const askHandle = !!s.cloud && !re && o.platform === 'YouTube';
     ovl.c = {
       title: re ? 'Reconnect ' + o.platform : 'Connect an account',
       talent: t ? t.name : '',
       platform: o.platform,
       notRe: !re,
+      askHandle,
+      fallback: !re && !askHandle,
+      connectOff: askHandle && !handle.trim() ? '.5' : '1',
       idle: !j.loading && !j.bad,
       loading: j.loading,
       long: j.long,
