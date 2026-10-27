@@ -369,12 +369,16 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const start = importLocal
       ? { talents: local!.talents as Talent[], pitches: (local!.pitches as Pitch[]) || [], posts: (local!.posts as ScheduledPost[]) || [] }
       : data;
-    this._sync = new Syncer(importLocal ? { talents: [], pitches: [], posts: [], draft: null } : { ...data, draft: p.draft }, (m) => this.toast(m));
-    this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }), () => this.movePicturesToStorage());
-    if (importLocal) {
+    // Keep the browser copy until the first save reaches the database, so a failed save or a closed tab loses nothing.
+    let imported = !importLocal;
+    const sync = new Syncer(importLocal ? { talents: [], pitches: [], posts: [], draft: null } : { ...data, draft: p.draft }, (m) => this.toast(m), () => {
+      if (imported) return;
+      imported = true;
       deleteSavedAccount(p.email);
-      this.toast('Your AI talents from this browser are now saved to your account.');
-    }
+      if (this._sync === sync) this.toast('Your AI talents from this browser are now saved to your account.');
+    });
+    this._sync = sync;
+    this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }), () => this.movePicturesToStorage());
   }
 
   /** Older talents kept their picture inline. Move each one to the storage bucket once. */
