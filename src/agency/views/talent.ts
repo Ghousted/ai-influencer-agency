@@ -68,7 +68,8 @@ function accountRows(app: AgencyApp, t: Talent) {
     const badge = anyLost ? ['Reconnect needed', '#FEECEC', '#B91C1C'] : allHandle ? ['Added by handle', '#F4F4F5', '#52525b'] : ['Connected', '#EAF2FF', '#006AFF'];
     return {
       name: p,
-      sub: on ? list.length + ' account' + (list.length === 1 ? '' : 's') : 'Not connected',
+      // While its login tab is open, the row says so (the message at the bottom goes away).
+      sub: app.waitingLogin(t.id) === p ? 'Waiting for you to log in to ' + p + ' in the other tab…' : on ? list.length + ' account' + (list.length === 1 ? '' : 's') : 'Not connected',
       logoBg: logoBg(p), filter: on ? 'none' : 'grayscale(1) opacity(.55)',
       noLogo: !LOGO[p], ytBg: '#FF0033',
       isOn: on, isOff: !on, badge: badge[0], badgeBg: badge[1], badgeFg: badge[2],

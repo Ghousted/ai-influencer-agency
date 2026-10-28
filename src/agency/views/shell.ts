@@ -1,3 +1,4 @@
+import { isProblem } from '../errors';
 import type { AgencyApp } from '../AgencyApp';
 
 /** Routing flags, top bar, toast, landing and auth values. */
@@ -50,5 +51,11 @@ export function shellView(app: AgencyApp) {
     logOut: () => app.logOut(),
     toastShow: !!s.toast,
     toastText: s.toast || '',
+    // Problems stay until closed (role alert); an action such as Undo shows as a button.
+    toastProblem: !!s.toast && isProblem(s.toast),
+    toastClose: () => app.closeToast(),
+    hasToastAction: !!app.toastAction,
+    toastActionLabel: app.toastAction ? app.toastAction.label : '',
+    toastActionRun: () => { const a = app.toastAction; app.closeToast(); a?.run(); },
   };
 }

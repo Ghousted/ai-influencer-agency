@@ -3,7 +3,7 @@ import { Fragment, type ReactNode } from 'react';
 
 /** Signed-in top bar, page background and toast, from the design file. */
 export function Shell({ v, children }: { v: any; children: ReactNode }) {
-  const { signedIn, goHome, nav, toggleAcct, initial, agencyName, acctMenu, userName, userEmail, goAccount, logOut, toastShow, toastText } = v;
+  const { signedIn, goHome, nav, toggleAcct, initial, agencyName, acctMenu, userName, userEmail, goAccount, logOut, toastShow, toastText, toastProblem, toastClose, hasToastAction, toastActionLabel, toastActionRun } = v;
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {signedIn ? (
@@ -65,8 +65,18 @@ export function Shell({ v, children }: { v: any; children: ReactNode }) {
       </main>
       {/* Outside <main> so it stacks above overlays, which render into document.body. */}
       {toastShow ? (
-        <div role="status" style={{ position: 'fixed', left: '50%', bottom: '28px', transform: 'translateX(-50%)', zIndex: '60', background: '#18181b', color: '#fff', padding: '12px 18px', borderRadius: '12px', font: "600 14px 'Plus Jakarta Sans',sans-serif", boxShadow: '0 8px 24px rgba(0,0,0,.2)', animation: 'aia-in .2s ease-out', maxWidth: '90vw' }}>
-          {toastText}
+        <div role={toastProblem ? 'alert' : 'status'} style={{ position: 'fixed', left: '50%', bottom: '28px', transform: 'translateX(-50%)', zIndex: '60', display: 'flex', alignItems: 'center', gap: '14px', background: '#18181b', color: '#fff', padding: '12px 12px 12px 18px', borderRadius: '12px', font: "600 14px 'Plus Jakarta Sans',sans-serif", boxShadow: '0 8px 24px rgba(0,0,0,.2)', animation: 'aia-in .2s ease-out', maxWidth: '90vw' }}>
+          <span style={{ paddingRight: hasToastAction || toastProblem ? '0' : '6px' }}>{toastText}</span>
+          {hasToastAction ? (
+            <button style={{ border: 'none', background: 'none', color: '#7FB2FF', font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: 'pointer', padding: '4px 6px', whiteSpace: 'nowrap' }} onClick={toastActionRun}>
+              {toastActionLabel}
+            </button>
+          ) : null}
+          {toastProblem ? (
+            <button style={{ border: 'none', background: 'none', color: '#A1A1AA', font: "700 18px/1 'Plus Jakarta Sans',sans-serif", cursor: 'pointer', padding: '2px 6px' }} onClick={toastClose} aria-label="Close message">
+              ×
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

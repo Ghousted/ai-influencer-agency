@@ -18,7 +18,7 @@ import { AgentCallError, accounts, agents, serverStatus, type AccountRead, type 
 import { realOnly } from './logic';
 import { Shell } from './Shell';
 import { buildView } from './views';
-import { errorText } from './errors';
+import { errorText, isProblem } from './errors';
 import { LandingScreen } from './screens/LandingScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -339,10 +339,29 @@ export class AgencyApp extends Component<AppProps, AppState> {
     };
   }
 
-  toast(text: string) {
+  /**
+   * Show a message at the bottom. A problem stays until the student closes it; other messages stay long
+   * enough to read. `action` adds a button, such as Undo.
+   */
+  toast(text: string, action?: { label: string; run: () => void }) {
     clearTimeout(this._tt);
+    this.toastAction = action || null;
     this.setState({ toast: text });
-    this._tt = setTimeout(() => this.setState({ toast: null }), 2800);
+    if (isProblem(text)) return;
+    const ms = Math.min(8000, Math.max(action ? 6000 : 2800, text.length * 60));
+    this._tt = setTimeout(() => this.closeToast(), ms);
+  }
+  toastAction: { label: string; run: () => void } | null = null;
+  closeToast() {
+    clearTimeout(this._tt);
+    this.toastAction = null;
+    this.setState({ toast: null });
+  }
+
+  /** The platform this tab waits on in a login tab for this talent, if any. */
+  waitingLogin(tid: string) {
+    const w = this._waiting;
+    return w && w.tid === tid ? w.platform : null;
   }
 
   setUi(patch: Record<string, any>) {

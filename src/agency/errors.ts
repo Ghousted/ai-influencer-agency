@@ -1,6 +1,11 @@
 // What the student reads when a call to the server fails. One message per error code from the API routes.
 import type { AgentErrorCode } from './api';
 
+/** A message about a problem: it stays on screen until the student closes it. */
+export function isProblem(text: string) {
+  return /could not|couldn't|can't|cannot|failed|did not load|not connected|session ended|lost its connection|check the|check your|please /i.test(text);
+}
+
 /** The message for an error code. `what` names the thing that failed, for example "that Instagram account". */
 export function errorText(code: AgentErrorCode | string, what = 'that account'): string {
   switch (code) {
