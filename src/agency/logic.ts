@@ -29,8 +29,10 @@ export function dailyByPlatform(t: Talent) {
   const back = (ms: number, n: number) => { const d = new Date(ms); d.setDate(d.getDate() - n); return d.getTime(); };
   const days = Array.from({ length: 7 }, (_, i) => back(dayOf(Date.now()), 6 - i));
   const labels = days.map((d) => DOW[new Date(d).getDay()]);
-  const live = t.accounts.filter((a) => a.mode === 'live');
-  const real = live.length > 0 && live.every((a) => a.stats);
+  // A talent with real and simulated accounts uses the real ones only.
+  const anyRead = t.accounts.some((a) => a.mode === 'live' && a.stats);
+  const live = t.accounts.filter((a) => a.mode === 'live' && (!anyRead || a.stats));
+  const real = anyRead;
   // Accounts read before the app kept posts have none until their next read.
   const stale = real && !live.some((a) => a.recent);
   const by: Record<string, { now: number[]; prev: number[] }> = {};
@@ -274,4 +276,16 @@ export function demoData(user: string, agency: string): { talents: Talent[]; pit
     return { id: uid('p'), talentId: tid, brandId: b.id, brandName: b.name, status, flagged: false, date: now - h * HOUR, ...pitchText(tt, b, user, agency) };
   };
   return { talents, pitches: [P('luna', 0, 'sent', 3), P('paolo', 0, 'approved', 20), P('luna', 1, 'draft', 26)] };
+}
+
+/**
+ * Signed in, a talent's numbers come only from accounts read for real. Accounts that an older version
+ * connected with made-up numbers become "added by handle", and their made-up numbers go.
+ */
+export function realOnly(t: Talent): Talent {
+  const fake = t.accounts.some((a) => a.mode === 'live' && !a.stats);
+  const stats = combineStats(t.accounts);
+  if (!fake && JSON.stringify(stats) === JSON.stringify(t.stats ?? null)) return t;
+  const accounts = fake ? t.accounts.map((a) => (a.mode === 'live' && !a.stats ? { ...a, mode: 'handle' as const, status: 'ok' as const } : a)) : t.accounts;
+  return { ...t, accounts, stats };
 }
