@@ -23,6 +23,10 @@ export function shellView(app: AgencyApp) {
     name: s.auth.name, email: s.auth.email, password: s.auth.password, agency: s.auth.agency,
     onName: app.authInput('name'), onEmail: app.authInput('email'), onPassword: app.authInput('password'), onAgency: app.authInput('agency'),
     err: s.authErr, hasErr: !!s.authErr,
+    // While a log in or sign up runs, its button says so and does nothing.
+    busy: !!s.authBusy,
+    loginLabel: s.authBusy ? 'Logging in…' : 'Log in',
+    signupLabel: s.authBusy ? 'Signing up…' : 'Sign up',
     login: () => app.submitLogin(),
     signup: () => app.signup(),
     social: () => app.toast('Social sign-in comes later. Use your email for now.'),

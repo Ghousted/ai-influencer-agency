@@ -407,8 +407,8 @@ export function TalentFormScreen({ v }: { v: any }) {
               ) : null}
               {(form.saveOn) ? (
                 <>
-                <button style={{ height: "46px", padding: "0 26px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={form.save} className="dc-h44">
-                  Save AI talent
+                <button style={{ height: "46px", padding: "0 26px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: form.saving ? "wait" : "pointer", opacity: form.saving ? ".7" : "1" }} onClick={form.save} disabled={form.saving} className="dc-h44">
+                  {form.saveLabel}
                 </button>
                 </>
               ) : null}
@@ -438,8 +438,8 @@ export function TalentFormScreen({ v }: { v: any }) {
               </button>
               {(form.canSave) ? (
                 <>
-                <button style={{ height: "46px", padding: "0 26px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={form.save} className="dc-h45">
-                  Save
+                <button style={{ height: "46px", padding: "0 26px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: form.saving ? "wait" : "pointer", opacity: form.saving ? ".7" : "1" }} onClick={form.save} disabled={form.saving} className="dc-h45">
+                  {form.saveEditLabel}
                 </button>
                 </>
               ) : null}

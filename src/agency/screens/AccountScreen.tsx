@@ -55,8 +55,8 @@ export function AccountScreen({ v }: { v: any }) {
                   <input style={{ height: "46px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif", color: "#18181b", minWidth: "0" }} type="email" value={acct.emailV} onChange={acct.onEmail} />
                 </label>
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button style={{ height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={acct.saveProfile}>
-                    Save
+                  <button style={{ height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: acct.profileBusy ? "wait" : "pointer", opacity: acct.profileBusy ? ".7" : "1" }} onClick={acct.saveProfile} disabled={acct.profileBusy}>
+                    {acct.profileLabel}
                   </button>
                 </div>
               </div>
@@ -68,8 +68,8 @@ export function AccountScreen({ v }: { v: any }) {
                   Agency name
                   <div style={{ display: "flex", gap: "10px" }}>
                     <input style={{ flex: "1", height: "46px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif", color: "#18181b", minWidth: "0" }} value={acct.val} onChange={acct.onVal} />
-                    <button style={{ height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={acct.save}>
-                      Rename
+                    <button style={{ height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: acct.renameBusy ? "wait" : "pointer", opacity: acct.renameBusy ? ".7" : "1" }} onClick={acct.save} disabled={acct.renameBusy}>
+                      {acct.renameLabel}
                     </button>
                   </div>
                 </label>
@@ -97,8 +97,8 @@ export function AccountScreen({ v }: { v: any }) {
                   </>
                 ) : null}
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button style={{ height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={acct.savePw}>
-                    Change password
+                  <button style={{ height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: acct.pwBusy ? "wait" : "pointer", opacity: acct.pwBusy ? ".7" : "1" }} onClick={acct.savePw} disabled={acct.pwBusy}>
+                    {acct.pwLabel}
                   </button>
                 </div>
               </div>

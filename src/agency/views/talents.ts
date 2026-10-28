@@ -251,6 +251,9 @@ function formView(app: AgencyApp) {
     cannotSave: !allOk,
     missingText: missing.length ? 'Add ' + andList(missing) + ' to save.' : (filling ? 'Wait for the app to fill it in.' : ''),
     save: () => { if (allOk) app.saveForm(); },
+    saving: !!app.state.ui.formSaving,
+    saveLabel: app.state.ui.formSaving ? 'Saving…' : 'Save AI talent',
+    saveEditLabel: app.state.ui.formSaving ? 'Saving…' : 'Save',
     del: () => { if (isEdit) app.setState({ ov: { kind: 'delete', tid: f.id } }); },
   };
 }

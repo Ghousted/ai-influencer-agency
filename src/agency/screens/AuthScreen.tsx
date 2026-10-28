@@ -99,8 +99,8 @@ export function AuthScreen({ v }: { v: any }) {
                     ) : null}
                     </>
                   ) : null}
-                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", boxShadow: "0 4px 10px 1px rgba(0,106,255,.2)", transition: "background .2s,transform .2s" }} type="submit" className="dc-h14 dc-a15">
-                    Log in
+                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: auth.busy ? "wait" : "pointer", opacity: auth.busy ? ".7" : "1", boxShadow: "0 4px 10px 1px rgba(0,106,255,.2)", transition: "background .2s,transform .2s" }} type="submit" disabled={auth.busy} className="dc-h14 dc-a15">
+                    {auth.loginLabel}
                   </button>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", font: "600 12px 'Plus Jakarta Sans',sans-serif", color: "#71717A" }}>
                     <span style={{ flex: "1", height: "1px", background: "#F1F1F3" }} />
@@ -194,8 +194,8 @@ export function AuthScreen({ v }: { v: any }) {
                     ) : null}
                     </>
                   ) : null}
-                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", boxShadow: "0 4px 10px 1px rgba(0,106,255,.2)", transition: "background .2s,transform .2s" }} type="submit" className="dc-h24 dc-a25">
-                    Sign up
+                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: auth.busy ? "wait" : "pointer", opacity: auth.busy ? ".7" : "1", boxShadow: "0 4px 10px 1px rgba(0,106,255,.2)", transition: "background .2s,transform .2s" }} type="submit" disabled={auth.busy} className="dc-h24 dc-a25">
+                    {auth.signupLabel}
                   </button>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", font: "600 12px 'Plus Jakarta Sans',sans-serif", color: "#71717A" }}>
                     <span style={{ flex: "1", height: "1px", background: "#F1F1F3" }} />
