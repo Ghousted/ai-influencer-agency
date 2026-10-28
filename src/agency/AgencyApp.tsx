@@ -5,7 +5,7 @@
 import { Component, type ChangeEvent } from 'react';
 import {
   HOUR, MONTHS, PLATFORMS, TCOLORS, TINTS, addDays, demoData, dlong, draftFromAccounts, first, fmt,
-  combineStats, dailyByPlatform, genBrands, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
+  combineStats, dailyByPlatform, genBrands, metricCards, viewsOf, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
   seedCalendar, starterIdeas, tstr, uid, ymd,
 } from './logic';
 import type { Account, ContentIdea, Idea, Job, Pitch, Platform, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
@@ -1342,32 +1342,14 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
 
-  metricCards(t: Talent) {
-    const s = t.stats;
-    if (!s) return [];
-    const stale = t.accounts.filter((a) => a.mode === 'live').every((a) => a.status === 'lost');
-    const row = (label: string, arr: [number, number] | null, kind: 'count' | 'pts' | 'pct', unit?: string) => {
-      if (!arr) return { label, value: 'Not available', na: true, notNa: false, sub: (s.timeBy || 'This platform') + ' does not share it', hasDelta: false, color: '#71717a', rot: 'none', delta: '', chip: '#F4F4F5' };
-      const [a, b] = arr;
-      let d: string, up: boolean;
-      if (kind === 'count') { const x = a - b; up = x >= 0; d = Math.abs(x) + (up ? ' more' : ' fewer') + ' than last week'; }
-      else if (kind === 'pts') { const x = Math.round((a - b) * 10) / 10; up = x >= 0; d = Math.abs(x) + (up ? '% more' : '% less') + ' than last week'; }
-      else { const x = Math.round((a - b) / b * 100); up = x >= 0; d = Math.abs(x) + (up ? '% more' : '% less') + ' than last week'; }
-      return { label, value: (kind === 'pts' ? a + '%' : fmt(a) + (unit || '')), na: false, notNa: true, sub: '', hasDelta: !stale, delta: d, color: up ? '#006AFF' : '#B91C1C', rot: up ? 'none' : 'rotate(180deg)', chip: up ? '#EAF2FF' : '#FEECEC' };
-    };
-    return [row('Posts', s.posts, 'count'), row('Views', s.views, 'pct'), row('Average engagement', s.eng, 'pts'), row('Time spent watching', s.time, 'pct', ' h')];
-  }
+  metricCards(t: Talent) { return metricCards(t); }
 
   pic(t: Talent) {
     return { hasPic: !!t.pic, noPic: !t.pic, pic: t.pic || '', picBg: t.pic ? 'url(' + t.pic + ')' : 'none', initials: initials(t.name), tint: t.tint };
   }
 
-  viewsOf(t: Talent) {
-    if (!t.stats) return null;
-    const [a, b] = t.stats.views;
-    const x = Math.round((a - b) / b * 100);
-    return { views: fmt(a), delta: Math.abs(x) + '%', up: x >= 0, color: x >= 0 ? '#006AFF' : '#B91C1C', rot: x >= 0 ? 'none' : 'rotate(180deg)' };
-  }
+  viewsOf(t: Talent) { return viewsOf(t); }
+
 
   // Re-exported helpers so view builders only need the app instance.
   helpers = { HOUR, first, fmt, initials, ymd, parseYmd, addDays, dlong, tstr };

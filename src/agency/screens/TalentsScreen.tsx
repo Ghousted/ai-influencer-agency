@@ -78,7 +78,7 @@ export function TalentsScreen({ v }: { v: any }) {
                             {c.views}
                           </span>
                           <span style={{ display: "flex", alignItems: "center", gap: "3px", font: "700 13px 'Plus Jakarta Sans',sans-serif", color: c.color }}>
-                            <svg style={{ transform: c.rot }} width="12" height="12" viewBox="0 0 14 14" fill="none">
+                            <svg style={{ transform: c.rot, display: c.arrow }} width="12" height="12" viewBox="0 0 14 14" fill="none">
                               <path d="M7 11.5V2.5M3 6.5l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                             {c.delta}

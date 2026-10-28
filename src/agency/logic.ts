@@ -237,6 +237,38 @@ export function combineStats(accounts: Account[]): Stats | null {
   };
 }
 
+/** The four number cards of an AI talent (this week against last week). */
+export function metricCards(t: Talent) {
+  const s = t.stats;
+  if (!s) return [];
+  const stale = t.accounts.filter((a) => a.mode === 'live').every((a) => a.status === 'lost');
+  const row = (label: string, arr: [number, number] | null, kind: 'count' | 'pts' | 'pct', unit?: string) => {
+    if (!arr) return { label, value: 'Not available', na: true, notNa: false, sub: (s.timeBy || 'This platform') + ' does not share it', hasDelta: false, color: '#71717a', rot: 'none', delta: '', chip: '#F4F4F5' };
+    const [a, b] = arr;
+    let d: string, up: boolean;
+    if (kind === 'count') { const x = a - b; up = x >= 0; d = Math.abs(x) + (up ? ' more' : ' fewer') + ' than last week'; }
+    else if (kind === 'pts') { const x = Math.round((a - b) * 10) / 10; up = x >= 0; d = Math.abs(x) + (up ? '% more' : '% less') + ' than last week'; }
+    else if (!b) {
+      // Nothing last week: a percent change has no meaning.
+      if (!a) return { label, value: fmt(a) + (unit || ''), na: false, notNa: true, sub: 'None last week either', hasDelta: false, color: '#71717a', rot: 'none', delta: '', chip: '#F4F4F5' };
+      up = true; d = 'None last week';
+    }
+    else { const x = Math.round((a - b) / b * 100); up = x >= 0; d = Math.abs(x) + (up ? '% more' : '% less') + ' than last week'; }
+    return { label, value: (kind === 'pts' ? a + '%' : fmt(a) + (unit || '')), na: false, notNa: true, sub: '', hasDelta: !stale, delta: d, color: up ? '#006AFF' : '#B91C1C', rot: up ? 'none' : 'rotate(180deg)', chip: up ? '#EAF2FF' : '#FEECEC' };
+  };
+  return [row('Posts', s.posts, 'count'), row('Views', s.views, 'pct'), row('Average engagement', s.eng, 'pts'), row('Time spent watching', s.time, 'pct', ' h')];
+}
+
+/** This week's views and the change against last week, for talent rows and cards. */
+export function viewsOf(t: Talent) {
+  if (!t.stats) return null;
+  const [a, b] = t.stats.views;
+  // No views last week: show "New" (or nothing when both weeks are 0), not Infinity% or NaN%.
+  if (!b) return { views: fmt(a), delta: a ? 'New' : '', up: true, color: a ? '#006AFF' : '#71717a', rot: 'none', arrow: a ? 'block' : 'none' };
+  const x = Math.round((a - b) / b * 100);
+  return { views: fmt(a), delta: Math.abs(x) + '%', up: x >= 0, color: x >= 0 ? '#006AFF' : '#B91C1C', rot: x >= 0 ? 'none' : 'rotate(180deg)', arrow: 'block' };
+}
+
 export function pitchText(t: Talent, b: Pick<Brand, 'name' | 'why' | 'what'>, user: string, agency: string) {
   const f = first(t);
   const s = t.stats && t.accounts.some((a) => a.mode === 'live') ? t.stats : null;

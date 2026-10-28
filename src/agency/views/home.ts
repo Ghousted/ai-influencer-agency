@@ -192,7 +192,7 @@ export function homeView(app: AgencyApp) {
       hasNumbers: numbers.length > 0, numbers: numbers.join(' · '),
       name: t.name, tint: t.tint, hasPic: !!t.pic, noPic: !t.pic, picBg: picBg(t), initials: initials(t.name),
       views: v ? v.views + ' views this week' : t.accounts.length ? 'No numbers yet' : 'No account yet',
-      hasV: !!v, delta: v ? v.delta : '', color: v ? v.color : '#71717a', rot: v ? v.rot : 'none',
+      hasV: !!v, delta: v ? v.delta : '', color: v ? v.color : '#71717a', rot: v ? v.rot : 'none', arrow: v ? v.arrow : 'none',
       open: () => app.openTalent(t.id),
     };
   });
