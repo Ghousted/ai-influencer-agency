@@ -183,7 +183,11 @@ export function overlaysView(app: AgencyApp) {
       askHandle,
       fallback: !re && !askHandle,
       connectOff: askHandle && !handle.trim() ? '.5' : '1',
-      idle: !j.loading && !j.bad,
+      idle: !j.loading && !j.bad && !o.pick,
+      // Several accounts came back from a login page (Facebook Pages): the student picks this talent's one.
+      picking: !j.loading && !j.bad && !!o.pick,
+      pickTitle: 'Which Page belongs to ' + (t ? t.name : 'this AI talent') + '?',
+      picks: (o.pick || []).map((r: { handle: string }, i: number) => ({ label: r.handle, go: () => app.pickAccount(i) })),
       loading: j.loading,
       long: j.long,
       bad: j.bad,
