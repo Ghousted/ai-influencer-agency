@@ -776,8 +776,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   /** The account fields from a real read. */
-  private readFields(r: AccountRead): Pick<Account, 'handle' | 'ref' | 'mode' | 'status' | 'readAt' | 'updated' | 'stats' | 'top'> {
-    return { handle: r.handle, ref: r.ref, mode: 'live', status: 'ok', readAt: Date.now(), updated: 0, stats: r.stats, top: r.top || [] };
+  private readFields(r: AccountRead): Pick<Account, 'handle' | 'ref' | 'mode' | 'status' | 'readAt' | 'updated' | 'stats' | 'top' | 'recent'> {
+    return { handle: r.handle, ref: r.ref, mode: 'live', status: 'ok', readAt: Date.now(), updated: 0, stats: r.stats, top: r.top || [], recent: r.recent || [] };
   }
 
   /**
@@ -1206,13 +1206,40 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
     const col = t.color || '#006AFF';
     const DN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const SL = ['Morning', 'Noon', 'Evening', 'Night'];
     const split = (tot: number, k: number) => {
       const ws = Array.from({ length: k }, () => 0.6 + rnd());
       const sm = ws.reduce((a, b) => a + b, 0);
       return ws.map((w) => Math.round(tot * w / sm));
     };
-    const now = split(t.stats.views[0], 7), prev = split(t.stats.views[1], 7);
-    const peak = Math.max(...now, ...prev);
+    const LOGO: Record<string, string> = { TikTok: '/assets/p-tiktok.png', Instagram: '/assets/p-instagram.png', Facebook: '/assets/p-facebook.png', YouTube: '/assets/p-youtube.png' };
+    const live = t.accounts.filter((a) => a.mode === 'live');
+    const handle = t.accounts.filter((a) => a.mode === 'handle');
+    const shades = [col, col + '99', col + '55', col + '33'];
+    // Accounts read for real have their own numbers and posts. Simulated accounts get made-up ones.
+    const real = live.length > 0 && live.every((a) => a.stats);
+    // Accounts read before the app kept posts have none until their next read.
+    const stale = real && !live.some((a) => a.recent);
+    const posts = real ? live.flatMap((a) => a.recent || []) : [];
+
+    // Views each day: real accounts add up the views of the posts from each day (the platforms share
+    // views per post, not per day). The 7 days end today; the dashed line is the 7 days before.
+    const dayOf = (ms: number) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+    const dayIx = (ms: number) => (new Date(ms).getDay() + 6) % 7;
+    let now: number[], prev: number[], labels: string[];
+    if (real) {
+      const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(dayOf(Date.now())); d.setDate(d.getDate() - (6 - i)); return d.getTime(); });
+      const weekAgo = (ms: number) => { const d = new Date(ms); d.setDate(d.getDate() - 7); return d.getTime(); };
+      const sumOn = (day: number) => posts.filter((p) => dayOf(p.at) === day).reduce((n, p) => n + p.views, 0);
+      now = days.map(sumOn);
+      prev = days.map((d) => sumOn(weekAgo(d)));
+      labels = days.map((d) => DN[dayIx(d)]);
+    } else {
+      now = split(t.stats.views[0], 7);
+      prev = split(t.stats.views[1], 7);
+      labels = DN;
+    }
+    const peak = Math.max(...now, ...prev, 10);
     const step = Math.pow(10, Math.floor(Math.log10(peak)));
     let top = Math.ceil(peak / step) * step;
     if (top / peak > 1.6) top = Math.ceil(peak / (step / 2)) * (step / 2);
@@ -1225,12 +1252,11 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }).join(' ');
     const nowD = sm(now.map((v, d) => [X(d), Y(v)])), prevD = sm(prev.map((v, d) => [X(d), Y(v)]));
     const bi = now.indexOf(Math.max(...now));
-    const LOGO: Record<string, string> = { TikTok: '/assets/p-tiktok.png', Instagram: '/assets/p-instagram.png', Facebook: '/assets/p-facebook.png', YouTube: '/assets/p-youtube.png' };
-    const live = t.accounts.filter((a) => a.mode === 'live');
-    const handle = t.accounts.filter((a) => a.mode === 'handle');
-    const shades = [col, col + '99', col + '55', col + '33'];
-    // Accounts read for real have their own numbers and posts. Simulated accounts get made-up ones.
-    const real = live.length > 0 && live.every((a) => a.stats);
+    const dayNote = stale ? 'Refresh the accounts to see the views of each day.'
+      : real && !now[bi] ? 'No views on posts from the last 7 days yet.'
+      : real ? 'Best day: ' + labels[bi] + '. Posts from that day got ' + fmt(now[bi]) + ' views.'
+      : 'Best day: ' + labels[bi] + ', with ' + fmt(now[bi]) + ' views.';
+
     const byViews = real ? [...live].sort((a, b) => b.stats!.views[0] - a.stats!.views[0]) : live;
     const pv = real ? byViews.map((a) => a.stats!.views[0]) : live.length ? split(t.stats.views[0], live.length).sort((a, b) => b - a) : [];
     const pvTotal = pv.reduce((n, v) => n + v, 0);
@@ -1241,41 +1267,73 @@ export class AgencyApp extends Component<AppProps, AppState> {
     });
     let topPosts;
     if (real) {
-      const posts = live.flatMap((a) => (a.top || []).map((p) => ({ ...p, platform: a.platform as string }))).sort((a, b) => b.views - a.views).slice(0, 4);
-      topPosts = posts.map((p, i) => row(i, p, p.views, posts[0].views, p.eng));
+      const best = live.flatMap((a) => (a.top || []).map((p) => ({ ...p, platform: a.platform as string }))).sort((a, b) => b.views - a.views).slice(0, 4);
+      topPosts = best.map((p, i) => row(i, p, p.views, best[0].views, p.eng));
     } else {
       // Simulated accounts have no posts, so the prototype shows made-up ones.
       const pool = [{ title: 'A day in my life', format: 'Short video' }, { title: 'Answering your questions', format: 'Reel' }, { title: '3 things I tried this week', format: 'Carousel' }, { title: 'Behind the scenes', format: 'Short video' }];
       const tv = split(Math.round(t.stats.views[0] * 0.62), 4).sort((a, b) => b - a);
       topPosts = pool.map((p, i) => row(i, { ...p, platform: live[i % Math.max(1, live.length)]?.platform || 'TikTok' }, tv[i], tv[0], t.stats!.eng[0] + (1.6 - i * 0.7) + rnd() * 0.4));
     }
-    const SL = ['Morning', 'Noon', 'Evening', 'Night'];
-    const base = [0.35, 0.5, 1, 0.7];
-    const dayB = [0.75, 0.7, 0.8, 0.95, 0.9, 1, 0.85];
+
+    // Best time to post: real accounts show the average views of the posts made in each day and time
+    // slot (the last 14 days). An empty cell had no post.
+    const slot = (ms: number) => { const h = new Date(ms).getHours(); return h >= 5 && h < 11 ? 0 : h < 15 ? 1 : h < 21 ? 2 : 3; };
+    let cellV: number[][], cellN: number[][];
+    if (real) {
+      cellV = SL.map(() => DN.map(() => 0));
+      cellN = SL.map(() => DN.map(() => 0));
+      for (const p of posts) { cellV[slot(p.at)][dayIx(p.at)] += p.views; cellN[slot(p.at)][dayIx(p.at)] += 1; }
+      cellV = cellV.map((r, ri) => r.map((v, ci) => (cellN[ri][ci] ? v / cellN[ri][ci] : 0)));
+    } else {
+      const base = [0.35, 0.5, 1, 0.7];
+      const dayB = [0.75, 0.7, 0.8, 0.95, 0.9, 1, 0.85];
+      cellV = SL.map((_, r) => DN.map((__, c) => base[r] * dayB[c] * (0.75 + rnd() * 0.5)));
+      cellN = SL.map(() => DN.map(() => 1));
+    }
     let best = { v: 0, r: 0, c: 0 };
-    const heat: any[] = SL.map((l, r) => ({ label: l, cells: DN.map((d, c) => { const v = base[r] * dayB[c] * (0.75 + rnd() * 0.5); if (v > best.v) best = { v, r, c }; return { v, d, l }; }) }));
-    const mx = best.v;
-    heat.forEach((h) => {
-      h.cells = h.cells.map((x: any, ci: number) => {
-        const a = x.v / mx;
+    cellV.forEach((r, ri) => r.forEach((v, ci) => { if (cellN[ri][ci] && v > best.v) best = { v, r: ri, c: ci }; }));
+    const heat = SL.map((l, r) => ({
+      label: l,
+      cells: DN.map((d, c) => {
+        const a = best.v ? cellV[r][c] / best.v : 0;
         const hex = Math.round(18 + a * 237).toString(16).padStart(2, '0');
-        const isB = h.label === SL[best.r] && ci === best.c;
-        return { bg: col + hex, ring: isB ? '0 0 0 2px #fff,0 0 0 4px ' + col : 'none', tip: x.d + ' ' + x.l.toLowerCase() + ': ' + Math.round(a * 100) + '% of peak' };
-      });
-    });
-    const totEng = Math.round(t.stats.views[0] * t.stats.eng[0] / 100);
-    const parts: [string, number][] = [['Likes', 0.72], ['Comments', 0.12], ['Shares', 0.09], ['Saves', 0.07]];
-    const eng = parts.map(([label, f], i) => ({ label, n: f, v: fmt(totEng * f), pct: Math.round(f * 100) + '%', bg: shades[i] }));
+        const isB = !!best.v && r === best.r && c === best.c;
+        const n = cellN[r][c];
+        const tip = !real ? d + ' ' + l.toLowerCase() + ': ' + Math.round(a * 100) + '% of peak'
+          : n ? d + ' ' + l.toLowerCase() + ': ' + fmt(Math.round(cellV[r][c])) + ' views on average (' + n + (n === 1 ? ' post)' : ' posts)')
+          : d + ' ' + l.toLowerCase() + ': no posts';
+        return { bg: n ? col + hex : '#F4F4F5', ring: isB ? '0 0 0 2px #fff,0 0 0 4px ' + col : 'none', tip };
+      }),
+    }));
+    const bestText = stale ? 'Refresh the accounts to see this' : !best.v ? 'Not enough posts yet' : DN[best.c] + ' ' + SL[best.r].toLowerCase();
+
+    // Engagement breakdown this week. Real accounts count each kind; a platform that does not share one counts 0.
+    let parts: [string, number][];
+    if (real) {
+      const wk = posts.filter((p) => p.at > Date.now() - 7 * 24 * HOUR);
+      const sum = (k: 'likes' | 'comments' | 'shares' | 'saves') => wk.reduce((n, p) => n + p[k], 0);
+      parts = [['Likes', sum('likes')], ['Comments', sum('comments')], ['Shares', sum('shares')], ['Saves', sum('saves')]];
+    } else {
+      const tot = Math.round(t.stats.views[0] * t.stats.eng[0] / 100);
+      parts = ([['Likes', 0.72], ['Comments', 0.12], ['Shares', 0.09], ['Saves', 0.07]] as [string, number][]).map(([l, f]) => [l, Math.round(tot * f)]);
+    }
+    const totEng = parts.reduce((n, [, v]) => n + v, 0);
+    const eng = parts.map(([label, v], i) => ({ label, n: totEng ? v / totEng : 0, v: fmt(v), pct: (totEng ? Math.round(v / totEng * 100) : 0) + '%', bg: shades[i] }));
     return {
       color: col, ticks: [fmt(top), fmt(Math.round(top / 2)), '0'], nowD, prevD, area: nowD + ' L' + X(6).toFixed(1) + ' 200 L' + X(0).toFixed(1) + ' 200 Z',
-      pts: now.map((v, d) => ({ x: (X(d) / 600 * 100).toFixed(2) + '%', y: (Y(v) / 200 * 100).toFixed(2) + '%', tip: DN[d] + ': ' + fmt(v) + ' views (last week ' + fmt(prev[d]) + ')' })),
-      days: DN.map((l, d) => ({ l, x: (X(d) / 600 * 100).toFixed(2) + '%', c: d === bi ? col : '#71717a' })),
-      dayNote: 'Best day: ' + DN[bi] + ', with ' + fmt(now[bi]) + ' views.',
+      chartTitle: real ? 'Views by the day posted' : 'Views each day',
+      pts: now.map((v, d) => ({ x: (X(d) / 600 * 100).toFixed(2) + '%', y: (Y(v) / 200 * 100).toFixed(2) + '%', tip: labels[d] + ': ' + fmt(v) + ' views (last week ' + fmt(prev[d]) + ')' })),
+      days: labels.map((l, d) => ({ l, x: (X(d) / 600 * 100).toFixed(2) + '%', c: d === bi ? col : '#71717a' })),
+      dayNote,
       plats, hasHandleOnly: handle.length > 0, handleNote: handle.map((a) => a.platform).join(', ') + ' is added by handle, so it shares no numbers.',
-      top: topPosts, noTop: !topPosts.length, topEmpty: real && !live.some((a) => a.top) ? 'Refresh the accounts to see this week\'s top posts.' : 'No posts this week yet.', dowL: DN.map((d) => d[0]), heat, best: DN[best.c] + ' ' + SL[best.r].toLowerCase(),
+      top: topPosts, noTop: !topPosts.length, topEmpty: real && !live.some((a) => a.top) ? 'Refresh the accounts to see this week\'s top posts.' : 'No posts this week yet.',
+      dowL: DN.map((d) => d[0]), heat, best: bestText,
+      heatSub: real ? 'Average views of your posts, by when they went up' : 'When the audience watches most',
       eng, engTotal: fmt(totEng) + ' total this week',
     };
   }
+
 
   metricCards(t: Talent) {
     const s = t.stats;

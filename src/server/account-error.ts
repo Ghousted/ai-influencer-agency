@@ -1,5 +1,5 @@
 // Errors and result shape shared by the platform readers (src/server/accounts.ts, youtube.ts, ...).
-import type { AccountStats, TopPost } from '@/agency/types';
+import type { AccountStats, RecentPost, TopPost } from '@/agency/types';
 
 /** `reconnect`: the platform stopped the app's access (token expired or removed). The student must connect again. */
 export type AccountErrorCode = 'bad_request' | 'not_found' | 'not_configured' | 'reconnect' | 'timeout' | 'upstream';
@@ -21,6 +21,8 @@ export type AccountRead = {
   few: boolean;
   /** The best posts this week, by views. */
   top: TopPost[];
+  /** Every post of the last 14 days, for the charts. */
+  recent: RecentPost[];
 };
 
 /** How many posts the "Top posts this week" card shows. */

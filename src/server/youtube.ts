@@ -99,6 +99,11 @@ export async function readYoutube({ handle, ref }: { handle?: string; ref?: stri
       const s = stats.get(v.id) || {};
       return { text: titles.get(v.id), format: 'Video', views: Number(s.viewCount || 0), acts: Number(s.likeCount || 0) + Number(s.commentCount || 0), url: 'https://youtu.be/' + v.id };
     })),
+    // YouTube's public numbers have no shares or saves.
+    recent: recent.map((v) => {
+      const s = stats.get(v.id) || {};
+      return { at: v.at, views: Number(s.viewCount || 0), likes: Number(s.likeCount || 0), comments: Number(s.commentCount || 0), shares: 0, saves: 0 };
+    }),
   };
 }
 

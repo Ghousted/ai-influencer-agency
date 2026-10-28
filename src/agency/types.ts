@@ -17,7 +17,12 @@ export type Account = {
   stats?: AccountStats;
   /** This account's best posts this week, from its last real read. */
   top?: TopPost[];
+  /** This account's posts of the last 14 days, from its last real read. The charts use them. */
+  recent?: RecentPost[];
 };
+
+/** A post of the last 14 days: when it went up (ms) and its numbers. 0 when the platform does not share one. */
+export type RecentPost = { at: number; views: number; likes: number; comments: number; shares: number; saves: number };
 
 /** A post from the last 7 days, as the platform reports it. */
 export type TopPost = { title: string; format: string; views: number; eng: number; url?: string };

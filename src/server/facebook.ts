@@ -119,6 +119,11 @@ export async function readFacebook(userId: string, ref: string): Promise<Account
       acts: (p.reactions?.summary?.total_count || 0) + (p.comments?.summary?.total_count || 0) + (p.shares?.count || 0),
       url: p.permalink_url,
     }))),
+    // Facebook shares no saves.
+    recent: recent.map((p) => ({
+      at: p.at, views: byId.get(p.id)?.views || 0, likes: p.reactions?.summary?.total_count || 0,
+      comments: p.comments?.summary?.total_count || 0, shares: p.shares?.count || 0, saves: 0,
+    })),
   };
 }
 

@@ -108,15 +108,26 @@ export async function readInstagram(userId: string, ref: string): Promise<Accoun
   const now = Date.now();
   const recent = (media.data || []).map((m) => ({ ...m, at: Date.parse(m.timestamp) })).filter((m) => m.at > now - 14 * DAY);
 
-  // Views come from each post's insights. A post that has no insights (too new, or an old format) counts 0.
+  // Views, saves and shares come from each post's insights. A post that has no insights (too new, or an
+  // old format) counts 0. A post that does not share saves or shares falls back to views only.
+  type Insights = { data?: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] };
   const views = new Map<string, number>();
+  const extra = new Map<string, { saves: number; shares: number }>();
   await Promise.all(recent.map(async (m) => {
+    const num = (r: Insights, name: string) => {
+      const v = r.data?.find((d) => d.name === name);
+      return Number(v?.values?.[0]?.value ?? v?.total_value?.value ?? 0);
+    };
     try {
-      const r = await call<{ data?: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }>(
-        `${GRAPH}/${m.id}/insights?${q({ metric: 'views' })}`,
-      );
-      const v = r.data?.find((d) => d.name === 'views');
-      views.set(m.id, Number(v?.values?.[0]?.value ?? v?.total_value?.value ?? 0));
+      let r: Insights;
+      try {
+        r = await call<Insights>(`${GRAPH}/${m.id}/insights?${q({ metric: 'views,saved,shares' })}`);
+      } catch (e) {
+        if (e instanceof AccountError && (e.code === 'reconnect' || e.code === 'timeout')) throw e;
+        r = await call<Insights>(`${GRAPH}/${m.id}/insights?${q({ metric: 'views' })}`);
+      }
+      views.set(m.id, num(r, 'views'));
+      extra.set(m.id, { saves: num(r, 'saved'), shares: num(r, 'shares') });
     } catch (e) {
       if (e instanceof AccountError && (e.code === 'reconnect' || e.code === 'timeout')) throw e;
     }
@@ -144,6 +155,10 @@ export async function readInstagram(userId: string, ref: string): Promise<Accoun
       acts: (m.like_count || 0) + (m.comments_count || 0),
       url: m.permalink,
     }))),
+    recent: recent.map((m) => ({
+      at: m.at, views: views.get(m.id) || 0, likes: m.like_count || 0, comments: m.comments_count || 0,
+      shares: extra.get(m.id)?.shares || 0, saves: extra.get(m.id)?.saves || 0,
+    })),
   };
 }
 
