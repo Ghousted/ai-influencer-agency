@@ -24,11 +24,13 @@ Social accounts are read on the server (PRD features 3–4):
   channel by handle with `YOUTUBE_API_KEY` (public numbers, no watch time).
 - `POST /api/accounts/read` — body `{ platform, handle?, ref? }`, returns `{ handle, ref, stats, few }`.
   Errors: 400 `bad_request`, 404 `not_found`, 409 `reconnect`, 503 `not_configured`, 504 `timeout`, 502 `upstream`.
-- `src/server/instagram.ts` — Instagram API with Instagram login. `POST /api/connect/instagram/start` returns the
-  login URL; Instagram sends the browser to `/api/connect/instagram/callback`, which saves the token and sends the
-  browser back to the app with `?connected=Instagram&tid&re&ref` (or `?connect_error=…`). `AgencyApp.finishReturn`
-  finishes the connect. `DELETE /api/connect/instagram?ref=` forgets a token; `deauthorize` and `delete` are Meta's callbacks.
-- Tokens live in `account_tokens` (migration 0003), encrypted with `TOKEN_ENCRYPTION_KEY` (`src/server/crypto.ts`).
+- Instagram and Facebook connect through their login page. `src/server/logins.ts` lists them by URL slug;
+  `src/server/instagram.ts` (Instagram login) and `src/server/facebook.ts` (Facebook Login for Business, Pages)
+  do the platform work. `POST /api/connect/{instagram|facebook}/start` returns the login URL; the platform sends the
+  browser to `/api/connect/<platform>/callback`, which saves the tokens and sends the browser back to the app with
+  `?connected=<Platform>&tid&re&ref=<id,id>` (or `?connect_error=…`). `AgencyApp.finishReturn` finishes the connect.
+  `DELETE /api/connect/<platform>?ref=` forgets a token; `deauthorize` and `delete` are Meta's callbacks.
+- Tokens live in `account_tokens` (migrations 0003, 0004), encrypted with `TOKEN_ENCRYPTION_KEY` (`src/server/crypto.ts`).
   No RLS policies: only the server reads it. The browser keeps only the account's `ref`.
 - Logins need an https `APP_URL`. In development, run ngrok and open the app at the ngrok URL, not localhost.
 - Each account keeps its own numbers (`Account.stats`, `ref`, `readAt`); `combineStats` in `logic.ts` adds them

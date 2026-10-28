@@ -6,9 +6,10 @@ import { supabaseAdmin } from './supabase';
 
 export type StoredToken = { token: string; refreshToken: string | null; expiresAt: number | null; updatedAt: number };
 
-export async function saveToken(userId: string, platform: Platform, ref: string, t: { token: string; refreshToken?: string | null; expiresAt?: number | null }) {
+/** `owner` is the platform user who granted the token (see migration 0004). */
+export async function saveToken(userId: string, platform: Platform, ref: string, t: { token: string; refreshToken?: string | null; expiresAt?: number | null; owner: string }) {
   const { error } = await supabaseAdmin().from('account_tokens').upsert({
-    user_id: userId, platform, ref,
+    user_id: userId, platform, ref, owner: t.owner,
     token: encrypt(t.token),
     refresh_token: t.refreshToken ? encrypt(t.refreshToken) : null,
     expires_at: t.expiresAt ? new Date(t.expiresAt).toISOString() : null,
@@ -35,8 +36,8 @@ export async function deleteToken(userId: string, platform: Platform, ref: strin
   await supabaseAdmin().from('account_tokens').delete().eq('user_id', userId).eq('platform', platform).eq('ref', ref);
 }
 
-/** Forget every token for an account (the account owner removed the app on the platform). */
-export async function deleteTokensForAccount(platform: Platform, ref: string) {
-  const { error } = await supabaseAdmin().from('account_tokens').delete().eq('platform', platform).eq('ref', ref);
+/** Forget every token a platform user granted (they removed the app on the platform, or asked to delete their data). */
+export async function deleteTokensForOwner(platform: Platform, owner: string) {
+  const { error } = await supabaseAdmin().from('account_tokens').delete().eq('platform', platform).eq('owner', owner);
   if (error) throw new Error(`Could not delete the tokens (${error.code}).`);
 }
