@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AgencyApp } from '../AgencyApp';
 import type { Talent } from '../types';
-import { PLATFORMS, dailyByPlatform, first, fmt, initials } from '../logic';
+import { PLATFORMS, agencyStats, dailyByPlatform, first, fmt, initials } from '../logic';
 
 const DAY_LONG: Record<string, string> = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 
@@ -43,11 +43,15 @@ export function homeView(app: AgencyApp) {
   const T = s.talents;
   const withStats = T.filter((t) => t.stats);
   const st = (t: Talent) => t.stats!;
-  const sum = (k: 'posts' | 'views' | 'eng' | 'time', i: 0 | 1) => withStats.reduce((a, t) => a + (st(t)[k] ? st(t)[k]![i] : 0), 0);
-  const engAvg = withStats.length ? Math.round(withStats.reduce((a, t) => a + st(t).eng[0], 0) / withStats.length * 10) / 10 : 0;
-  const engPrev = withStats.length ? Math.round(withStats.reduce((a, t) => a + st(t).eng[1], 0) / withStats.length * 10) / 10 : 0;
+  // An account linked to two AI talents counts once; engagement is weighted by views.
+  const ag = agencyStats(T);
+  const sum = (k: 'posts' | 'views' | 'time', i: 0 | 1) => (ag && ag[k] ? ag[k]![i] : 0);
+  const engAvg = ag ? ag.eng[0] : 0;
+  const engPrev = ag ? ag.eng[1] : 0;
   const vNow = sum('views', 0), vPrev = sum('views', 1);
-  const timeMissing = withStats.some((t) => !st(t).time);
+  // A talent's watch time can leave out some of its platforms (timeBy), or all of them (no time).
+  const noTime = (t: Talent) => !st(t).time || !!st(t).timeBy;
+  const timeMissing = withStats.some(noTime);
   const timeAny = withStats.some((t) => st(t).time);
   const picBg = (t: Talent) => (t.pic ? 'url(' + t.pic + ')' : 'none');
   const colorOf = (t: Talent) => t.color || '#006AFF';
@@ -116,8 +120,8 @@ export function homeView(app: AgencyApp) {
     mk('Average engagement', engAvg, engPrev, engAvg + '%', engPrev + '%', true),
     timeCard,
   ];
-  const missingBy = Array.from(new Set(withStats.filter((t) => !st(t).time).map((t) => st(t).timeBy || t.accounts.find((a) => a.mode === 'live')?.platform || 'One platform')));
-  const missingWho = withStats.filter((t) => !st(t).time).map((t) => first(t));
+  const missingBy = Array.from(new Set(withStats.filter(noTime).map((t) => st(t).timeBy || t.accounts.find((a) => a.mode === 'live')?.platform || 'One platform')));
+  const missingWho = withStats.filter(noTime).map((t) => first(t));
   const timeNote = '* Time spent watching leaves out ' + missingWho.join(', ') + '. ' + missingBy.join(' and ') + (missingBy.length === 1 ? ' does' : ' do') + ' not share it.';
 
   // Views each day: one line per AI talent, for all platforms or the one picked in the dropdown.
