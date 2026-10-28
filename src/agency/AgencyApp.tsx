@@ -81,6 +81,7 @@ const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook', 'TikTok'];
 
 /** The tid a login page carries when it was opened from the new AI talent form (the talent has no id yet). */
 const FORM_TID = 'new-talent';
+const WAITING_KEY = 'aia-waiting-login';
 
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 const ACCOUNT_KEYS = ['user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
@@ -113,8 +114,21 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private _return: { platform: Platform; tid: string; re: string | null; ref: string | null; error: string | null } | null = null;
   /** Login tabs send their result on this channel (see tabPage in the connect callback). */
   private _bc?: BroadcastChannel;
-  /** The login this tab opened in a new tab. Other app tabs ignore its result, so the account is added once. */
-  private _waiting: { platform: Platform; tid: string } | null = null;
+  /**
+   * The login this tab opened in a new tab. Other app tabs ignore its result, so the account is added once.
+   * `sent` is the talent id the login page sends back; `tid` is where the account goes (a new talent saved
+   * while its login was still open gets the account). `n` counts logins started for the same account.
+   * Kept in sessionStorage, so a reload of this tab still takes the result.
+   */
+  private _waitingMem: { platform: Platform; tid: string; sent: string; n: number } | null = null;
+  private get _waiting() {
+    if (this._waitingMem) return this._waitingMem;
+    try { return JSON.parse(sessionStorage.getItem(WAITING_KEY) || 'null'); } catch { return null; }
+  }
+  private set _waiting(w: { platform: Platform; tid: string; sent: string; n: number } | null) {
+    this._waitingMem = w;
+    try { if (w) sessionStorage.setItem(WAITING_KEY, JSON.stringify(w)); else sessionStorage.removeItem(WAITING_KEY); } catch { /* storage blocked */ }
+  }
   private _onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.state.ov) this.setState({ ov: null });
@@ -920,7 +934,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
       }
       const r = await accounts.startLogin(pl, tid, reId, !!tab);
       if (!tab) { window.location.assign(r.url); return; }
-      this._waiting = { platform: pl, tid };
+      // A second Log in for the same account replaces the first one's login cookie (see tabReturn).
+      const prev = this._waiting;
+      const n = prev && prev.platform === pl && prev.sent === tid ? prev.n + 1 : 1;
+      this._waiting = { platform: pl, tid: n > 1 && prev ? prev.tid : tid, sent: tid, n };
       tab.location.href = r.url;
       this.toast('Log in to ' + pl + ' in the new tab.');
     } catch (e) {
@@ -957,7 +974,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const w = this._waiting;
     if (!w || !d || typeof d !== 'object') return;
     const platform = (d.connected || d.platform) as Platform;
-    if (platform !== w.platform || d.tid !== w.tid) return;
+    if (platform !== w.platform || d.tid !== w.sent) return;
+    // The student pressed Log in twice: the first login tab ends with "expired"; the second one counts.
+    if (d.connect_error === 'expired' && w.n > 1) { this._waiting = { ...w, n: w.n - 1 }; return; }
     this._waiting = null;
     const ref = d.connected && typeof d.ref === 'string' ? d.ref : null;
     this._return = { platform, tid: w.tid, re: typeof d.re === 'string' ? d.re : null, ref, error: ref ? null : d.connect_error || 'failed' };
@@ -1277,6 +1296,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
     t.brands = this.state.cloud && this._agentsOn ? [] : genBrands(t).map((b) => ({ ...b, flagged: false }));
     if (fAccs.length && !(real && this._agentsOn)) t.ideas = starterIdeas(t).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
     this.setState((s) => ({ talents: s.talents.concat([t]), draft: null }));
+    // A login tab still open for this form: its account goes to the saved talent.
+    const w = this._waiting;
+    if (w && w.sent === FORM_TID) this._waiting = { ...w, tid: t.id };
     this.go('talent', { talentId: t.id, tab: 'overview', _saved: true, draft: null });
     this.toast(t.name + ' was added.' + (fAccs.length ? '' : ' Next, connect an account.'));
   }
