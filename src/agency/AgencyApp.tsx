@@ -104,6 +104,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private _live: Platform[] = [];
   /** A platform login page just sent the student back (?connected=… or ?connect_error=…). */
   private _return: { platform: Platform; tid: string; re: string | null; ref: string | null; error: string | null } | null = null;
+  /** Login tabs send their result on this channel (see tabPage in the connect callback). */
+  private _bc?: BroadcastChannel;
+  /** The login this tab opened in a new tab. Other app tabs ignore its result, so the account is added once. */
+  private _waiting: { platform: Platform; tid: string } | null = null;
   private _onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.state.ov) this.setState({ ov: null });
@@ -154,6 +158,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
     setTimeout(this._armReveal, 50);
 
     this._return = this.readReturn();
+    try {
+      this._bc = new BroadcastChannel('aia-connect');
+      this._bc.onmessage = (e) => this.tabReturn(e.data);
+    } catch { /* no BroadcastChannel: logins run in this tab */ }
     const demo = (this.props.startAt ?? 'Start page') === 'Signed in';
     if (demo) {
       this._hydrated = true;
@@ -188,6 +196,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   componentWillUnmount() {
     if (this._nr) removeEventListener('resize', this._nr);
     removeEventListener('keydown', this._onKey);
+    this._bc?.close();
     this._tlOff?.();
     this._revealIO?.disconnect();
     Object.values(this.timers).forEach((a) => a.forEach(clearTimeout));
@@ -833,14 +842,47 @@ export class AgencyApp extends Component<AppProps, AppState> {
    */
   private startLogin(o: any) {
     const open = () => this.state.ov?.kind === 'connect';
+    const tab = this.state.cloud && (this.props.simulate ?? 'normal') === 'normal' ? this.loginTab() : null;
     this.liveJob('connect', async () => {
       await this._sync?.flush();
-      return accounts.startLogin(o.platform, o.tid, o.reId || null);
+      return accounts.startLogin(o.platform, o.tid, o.reId || null, !!tab);
     }, (r) => {
-      if (open()) window.location.assign(r.url);
-    }, () => { if (open()) this.mockConnect(o); }, (code, message) => {
+      if (!tab) { if (open()) window.location.assign(r.url); return; }
+      if (!open()) { tab.close(); return; }
+      this._waiting = { platform: o.platform, tid: o.tid };
+      tab.location.href = r.url;
+      this.toast('Log in to ' + o.platform + ' in the new tab.');
+    }, () => { tab?.close(); if (open()) this.mockConnect(o); }, (code, message) => {
+      tab?.close();
       if (code === 'wrong_origin') this.toast(message);
     });
+  }
+
+  /**
+   * A new tab for a platform's login page, so this tab keeps its place. It must open during the click,
+   * or the browser blocks it. Null when blocked: the login then runs in this tab.
+   */
+  private loginTab(): Window | null {
+    try {
+      const tab = window.open('', '_blank');
+      // The login page must not be able to move this tab.
+      if (tab) tab.opener = null;
+      return tab;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The result from a login tab: finish the connect in this tab, as after a login in this tab. */
+  private tabReturn(d: any) {
+    const w = this._waiting;
+    if (!w || !d || typeof d !== 'object') return;
+    const platform = (d.connected || d.platform) as Platform;
+    if (platform !== w.platform || d.tid !== w.tid) return;
+    this._waiting = null;
+    const ref = d.connected && typeof d.ref === 'string' ? d.ref : null;
+    this._return = { platform, tid: w.tid, re: typeof d.re === 'string' ? d.re : null, ref, error: ref ? null : d.connect_error || 'failed' };
+    this.finishReturn();
   }
 
   /** Read and forget the ?connected=… or ?connect_error=… that a platform login page sent back. */
@@ -883,10 +925,14 @@ export class AgencyApp extends Component<AppProps, AppState> {
     });
   }
 
-  /** Back from a login page opened in the new AI talent form: resume the draft at step 2 and read the account. */
+  /**
+   * Back from a login page opened in the new AI talent form: read the account into step 2. After a login
+   * in a new tab the form is still open; after a login in this tab, the form comes back from the draft.
+   */
   private finishFormReturn(r: NonNullable<AgencyApp['_return']>) {
-    if (!this.state.draft) { this.toast("I couldn't find the AI talent you were adding. Start it again."); return; }
-    this.openForm('new');
+    const here = this.state.route === 'form' && this.state.form?.mode === 'new';
+    if (!here && !this.state.draft) { this.toast("I couldn't find the AI talent you were adding. Start it again."); return; }
+    if (!here) this.openForm('new');
     this.setState((s) => (s.form ? { form: { ...s.form, step: 2, resumed: false } } : null));
     const pl = r.platform;
     if (r.error || !r.ref) {
@@ -1044,16 +1090,24 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   /**
-   * Open a platform's login page from the new AI talent form. The form is kept as the draft, so the
-   * platform's return (finishFormReturn) brings the student back to step 2 with the account connected.
+   * Open a platform's login page from the new AI talent form, in a new tab. The login tab sends its result
+   * back (tabReturn), and the account goes into step 2. If the browser blocks the tab, the login runs in
+   * this tab and the form comes back from the draft (finishFormReturn).
    */
   private formLogin(pl: Platform) {
+    const tab = this.loginTab();
     this.setState((s) => (s.form ? { form: { ...s.form, accs: { ...(s.form.accs || {}), [pl]: { handle: '', phase: 'loading' } } } } : null), async () => {
       try {
+        // Without a new tab the browser leaves this page, so the draft must be saved first.
         await this._sync?.flush();
-        const r = await accounts.startLogin(pl, FORM_TID, null);
-        window.location.assign(r.url);
+        const r = await accounts.startLogin(pl, FORM_TID, null, !!tab);
+        if (!tab) { window.location.assign(r.url); return; }
+        this._waiting = { platform: pl, tid: FORM_TID };
+        tab.location.href = r.url;
+        this.setFormAcc(pl, null);
+        this.toast('Log in to ' + pl + ' in the new tab.');
       } catch (e) {
+        tab?.close();
         this.setFormAcc(pl, null);
         const code = e instanceof AgentCallError ? e.code : 'server';
         this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. Try again.');

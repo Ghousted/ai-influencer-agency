@@ -97,8 +97,8 @@ export const accounts = {
    * brings it back with ?connected=<Platform>&tid&re&ref=<id,id> (or ?connect_error=…). Fails with
    * `wrong_origin` when the app is not open at APP_URL.
    */
-  startLogin: (platform: Platform, tid: string, reId: string | null) =>
-    post<{ url: string }>(`/api/connect/${platform.toLowerCase()}/start`, { tid, reId }),
+  startLogin: (platform: Platform, tid: string, reId: string | null, tab = false) =>
+    post<{ url: string }>(`/api/connect/${platform.toLowerCase()}/start`, { tid, reId, tab }),
 
   /** Forget the server's token for an account the student disconnected. */
   forget: (platform: Platform, ref: string) =>
