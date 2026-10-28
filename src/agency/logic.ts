@@ -1,6 +1,6 @@
 // Mock data and text generators, ported from the design prototype.
 // The Grow, Scout, Content and Pitch agents are simulated here until the real agents exist.
-import type { Account, Brand, ContentIdea, Idea, Pitch, ScheduledPost, Talent } from './types';
+import type { Account, Brand, ContentIdea, Idea, Pair, Pitch, ScheduledPost, Stats, Talent } from './types';
 
 export const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -168,6 +168,29 @@ export function moreIdeas(t: Pick<Talent, 'name' | 'stats'>): IdeaSeed[] {
     { title: 'Make a part 2 of your top post', why: 'Your top post this week had ' + fmt(v * 0.18) + ' views, ' + Math.round(3 + (v % 3)) + ' times your usual.' },
     { title: 'Use the same opening line style for a week', why: 'Posts that start with a question kept people watching ' + (t.stats && t.stats.time ? 'longer' : 'more') + ' than the rest.' },
     { title: 'Invite a creator in your niche to a collab', why: 'Your one collab post got ' + fmt(v * 0.11) + ' views.' }];
+}
+
+/**
+ * A talent's numbers from the accounts that were read for real: posts, views and watch time add up,
+ * and engagement is the views-weighted average. Null when no live account has real numbers yet.
+ */
+export function combineStats(accounts: Account[]): Stats | null {
+  const read = accounts.filter((a) => a.mode === 'live' && a.stats);
+  if (!read.length) return null;
+  const sum = (list: Account[], f: (a: Account) => Pair): Pair => [0, 1].map((i) => list.reduce((n, a) => n + f(a)[i], 0)) as Pair;
+  const views = sum(read, (a) => a.stats!.views);
+  const eng = [0, 1].map((i) => (views[i] ? Math.round((read.reduce((n, a) => n + a.stats!.eng[i] * a.stats!.views[i], 0) / views[i]) * 10) / 10 : 0)) as Pair;
+  const timed = read.filter((a) => a.stats!.time);
+  const untimed = Array.from(new Set(read.filter((a) => !a.stats!.time).map((a) => a.platform)));
+  const at = new Date(Math.max(...read.map((a) => a.readAt || 0)) || Date.now());
+  return {
+    posts: sum(read, (a) => a.stats!.posts),
+    views,
+    eng,
+    time: timed.length ? sum(timed, (a) => a.stats!.time!) : null,
+    timeBy: untimed.length ? untimed.join(' and ') : undefined,
+    taken: MONTHS[at.getMonth()] + ' ' + at.getDate(),
+  };
 }
 
 export function pitchText(t: Talent, b: Pick<Brand, 'name' | 'why' | 'what'>, user: string, agency: string) {

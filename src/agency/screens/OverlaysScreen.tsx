@@ -53,13 +53,18 @@ function OverlaysBody({ v }: { v: any }) {
                     </div>
                     </>
                   ) : null}
+                  {(ovl.c.askHandle) ? (
+                    <>
+                    <input style={{ height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" />
+                    </>
+                  ) : null}
                   <div style={{ font: "500 13px/1.5 'Plus Jakarta Sans',sans-serif", color: "#52525b" }}>
                     The app only reads the numbers. The app does not post or send items.
                   </div>
-                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={ovl.c.connect} className="dc-h61">
+                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.connectOff }} onClick={ovl.c.connect} className="dc-h61">
                     Connect {ovl.c.platform}
                   </button>
-                  {(ovl.c.notRe) ? (
+                  {(ovl.c.fallback) ? (
                     <>
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "14px", borderTop: "1px solid #F4F4F5" }}>
                       <div style={{ font: "500 13px/1.5 'Plus Jakarta Sans',sans-serif", color: "#52525b" }}>

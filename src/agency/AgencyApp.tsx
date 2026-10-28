@@ -5,15 +5,15 @@
 import { Component, type ChangeEvent } from 'react';
 import {
   HOUR, MONTHS, TCOLORS, TINTS, addDays, demoData, dlong, draftFromAccounts, first, fmt,
-  genBrands, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
+  combineStats, genBrands, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
   seedCalendar, starterIdeas, tstr, uid, ymd,
 } from './logic';
-import type { ContentIdea, Idea, Job, Pitch, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
+import type { Account, ContentIdea, Idea, Job, Pitch, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
 import { deleteSavedAccount, loadAccount, loadState, saveAccount, saveState } from './persist';
 import * as backend from './backend';
 import { supabase } from './supabase';
 import { loadData, Syncer } from './sync';
-import { AgentCallError, agents, agentsConfigured } from './api';
+import { AgentCallError, accounts, agents, agentsConfigured, type AccountRead, type AgentErrorCode } from './api';
 import { Shell } from './Shell';
 import { buildView } from './views';
 import { LandingScreen } from './screens/LandingScreen';
@@ -283,9 +283,19 @@ export class AgencyApp extends Component<AppProps, AppState> {
    * Run an agent. Signed-in students with an OpenRouter key get the real agent through /api/agents;
    * everyone else (local demo, ?simulate) gets the mock agent through runJob.
    */
-  async agentJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void) {
+  agentJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void) {
+    if (!this._agentsOn) { this.runJob(key, mock); return; }
+    return this.liveJob(key, call, apply, mock, (code) => { if (code === 'no_key') this._agentsOn = false; });
+  }
+
+  /**
+   * Run a real server call for a signed-in student, with the same loading, slow, failed and stalled
+   * states as runJob. Signed out, under ?simulate, or when the server is not set up for it
+   * (`no_key`, `not_configured`), the mock runs instead.
+   */
+  async liveJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void, onError?: (code: AgentErrorCode) => void) {
     const sim = this.props.simulate ?? 'normal';
-    if (!this.state.cloud || !this._agentsOn || sim !== 'normal') { this.runJob(key, mock); return; }
+    if (!this.state.cloud || sim !== 'normal') { this.runJob(key, mock); return; }
     this.clearJob(key);
     const set = (p: Partial<Job>) => this.setState((s) => ({ jobs: { ...s.jobs, [key]: { ...(s.jobs[key] || { phase: 'idle' }), ...p } } }));
     set({ phase: 'loading', long: false });
@@ -299,7 +309,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     } catch (e) {
       this.clearJob(key);
       const code = e instanceof AgentCallError ? e.code : 'server';
-      if (code === 'no_key') { this._agentsOn = false; this.runJob(key, mock); return; }
+      onError?.(code);
+      if (code === 'no_key' || code === 'not_configured') { this.runJob(key, mock); return; }
       if (code === 'needs_account') { set({ phase: 'done', long: false }); return; }
       set({ phase: code === 'timeout' ? 'stalled' : 'failed', long: false });
     }
@@ -731,28 +742,65 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.setState((s) => ({ ov: { kind: 'connect', tid, platform: a ? a.platform : (plat || 'TikTok'), handle: '', reId: reAcc || null }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
   }
 
+  /**
+   * The talent with a new account list, and its numbers worked out again. Real reads add up
+   * (combineStats); a talent with only simulated accounts keeps its simulated numbers.
+   */
+  withAccounts(t: Talent, accounts: Account[]): Talent {
+    const live = accounts.some((a) => a.mode === 'live');
+    return { ...t, accounts, stats: combineStats(accounts) || (live ? t.stats : null) };
+  }
+
+  /** The account fields from a real read. */
+  private readFields(r: AccountRead): Pick<Account, 'handle' | 'ref' | 'mode' | 'status' | 'readAt' | 'updated' | 'stats'> {
+    return { handle: r.handle, ref: r.ref, mode: 'live', status: 'ok', readAt: Date.now(), updated: 0, stats: r.stats };
+  }
+
+  /** Connect (or reconnect) the account in the connect overlay. YouTube is read by its handle. */
   connectNow() {
-    this.runJob('connect', () => {
-      const o2 = this.state.ov;
-      if (!o2) return;
-      this.upd(o2.tid, (t) => {
-        let accounts;
-        if (o2.reId) accounts = t.accounts.map((a) => (a.id === o2.reId ? { ...a, status: 'ok' as const, updated: 0 } : a));
-        else accounts = t.accounts.concat([{ id: uid('a'), platform: o2.platform, handle: '@' + t.name.toLowerCase().replace(/[^a-z]/g, ''), mode: 'live', status: 'ok', updated: 0 }]);
-        const nt: Talent = { ...t, accounts };
-        if (!t.stats) {
-          nt.stats = { posts: [5, 3], views: [2600, 1900], eng: [6.4, 5.9], time: o2.platform === 'Facebook' ? null : [18, 12], timeBy: o2.platform, taken: MONTHS[new Date().getMonth()] + ' ' + new Date().getDate() };
-          nt.few = true;
-        }
-        if (!t.ideas.length) {
-          nt.ideas = starterIdeas(nt).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
-          nt.growLoaded = false;
-        }
-        return nt;
+    const o = this.state.ov;
+    if (!o) return;
+    const t0 = this.T(o.tid);
+    const re = o.reId ? t0?.accounts.find((a) => a.id === o.reId) : undefined;
+    // A handle typed in the overlay wins; a reconnect without one reads the same account again.
+    const typed = (o.handle || '').trim();
+    const by = typed ? { handle: typed } : re?.ref ? { ref: re.ref } : { handle: re?.handle || '' };
+    if (this.state.cloud && o.platform === 'YouTube' && !by.handle && !by.ref) return;
+    // Closing the overlay while it connects cancels the connect.
+    const open = () => this.state.ov?.kind === 'connect';
+    this.liveJob('connect', () => accounts.read(o.platform, by), (r) => {
+      if (!open()) return;
+      this.upd(o.tid, (t) => {
+        const accs = o.reId
+          ? t.accounts.map((a) => (a.id === o.reId ? { ...a, ...this.readFields(r) } : a))
+          : t.accounts.concat([{ id: uid('a'), platform: o.platform, ...this.readFields(r) }]);
+        // The real Grow agent writes the first ideas when the Grow tab opens.
+        return { ...this.withAccounts(t, accs), few: r.few, growLoaded: t.ideas.length ? t.growLoaded : false };
       });
       this.setState({ ov: null });
-      this.toast((o2.reId ? 'Reconnected ' : 'Connected ') + o2.platform + '.');
+      this.toast((o.reId ? 'Reconnected ' : 'Connected ') + o.platform + ' ' + r.handle + '.');
+    }, () => { if (open()) this.mockConnect(o); });
+  }
+
+  /** The prototype's simulated connect: made-up numbers and starter ideas. */
+  private mockConnect(o2: any) {
+    this.upd(o2.tid, (t) => {
+      let accounts;
+      if (o2.reId) accounts = t.accounts.map((a) => (a.id === o2.reId ? { ...a, status: 'ok' as const, updated: 0 } : a));
+      else accounts = t.accounts.concat([{ id: uid('a'), platform: o2.platform, handle: '@' + t.name.toLowerCase().replace(/[^a-z]/g, ''), mode: 'live', status: 'ok', updated: 0 }]);
+      const nt: Talent = { ...t, accounts };
+      if (!t.stats) {
+        nt.stats = { posts: [5, 3], views: [2600, 1900], eng: [6.4, 5.9], time: o2.platform === 'Facebook' ? null : [18, 12], timeBy: o2.platform, taken: MONTHS[new Date().getMonth()] + ' ' + new Date().getDate() };
+        nt.few = true;
+      }
+      if (!t.ideas.length) {
+        nt.ideas = starterIdeas(nt).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
+        nt.growLoaded = false;
+      }
+      return nt;
     });
+    this.setState({ ov: null });
+    this.toast((o2.reId ? 'Reconnected ' : 'Connected ') + o2.platform + '.');
   }
 
   addByHandle() {
@@ -766,19 +814,28 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   refreshAccount(tid: string, aid: string) {
-    this.runJob('refresh-' + aid, () => {
+    const a0 = this.T(tid)?.accounts.find((x) => x.id === aid);
+    if (!a0) return;
+    const mock = () => {
       this.upd(tid, (t) => ({ ...t, accounts: t.accounts.map((a) => (a.id === aid ? { ...a, updated: 0 } : a)) }));
       this.toast('Numbers updated.');
+    };
+    // Accounts from before the real connect have no ref, so they stay simulated.
+    if (!a0.ref) { this.runJob('refresh-' + aid, mock); return; }
+    this.liveJob('refresh-' + aid, () => accounts.read(a0.platform, { ref: a0.ref }), (r) => {
+      this.upd(tid, (t) => ({ ...this.withAccounts(t, t.accounts.map((a) => (a.id === aid ? { ...a, ...this.readFields(r) } : a))), few: r.few }));
+      this.toast('Numbers updated.');
+    }, mock, (code) => {
+      // The channel is gone: keep its last good numbers and ask for Reconnect.
+      if (code === 'not_found') this.upd(tid, (t) => ({ ...t, accounts: t.accounts.map((a) => (a.id === aid ? { ...a, status: 'lost' as const } : a)) }));
+      else if (code !== 'no_key' && code !== 'not_configured') this.toast("I couldn't read the numbers. Try again.");
     });
   }
 
   disconnectAccount(tid: string, aid: string) {
     const t = this.T(tid);
     const a = t?.accounts.find((x) => x.id === aid);
-    this.upd(tid, (x) => {
-      const accounts = x.accounts.filter((y) => y.id !== aid);
-      return { ...x, accounts, stats: accounts.some((y) => y.mode === 'live') ? x.stats : null };
-    });
+    this.upd(tid, (x) => this.withAccounts(x, x.accounts.filter((y) => y.id !== aid)));
     this.setState({ ov: null });
     if (a) this.toast(a.platform + ' ' + a.handle + ' was removed.');
   }
@@ -838,8 +895,20 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const h = (acc.handle || '').trim();
     if (!h) return;
     const handle = h[0] === '@' ? h : '@' + h;
-    this.setState((s) => ({ form: { ...s.form, accs: { ...(s.form.accs || {}), [pl]: { handle, phase: 'loading' } } } }));
-    setTimeout(() => this.setState((s) => (s.form ? { form: { ...s.form, accs: { ...(s.form.accs || {}), [pl]: { handle, phase: 'on' } } } } : null)), 1100);
+    const setAcc = (v: any) => this.setState((s) => (s.form ? { form: { ...s.form, accs: { ...(s.form.accs || {}), [pl]: v } } } : null));
+    setAcc({ handle, phase: 'loading' });
+    const mock = () => setTimeout(() => setAcc({ handle, phase: 'on' }), 1100);
+    if (!this.state.cloud || (this.props.simulate ?? 'normal') !== 'normal') { mock(); return; }
+    // Signed in: read the account for real. The numbers are kept until the talent is saved.
+    accounts.read(pl as Account['platform'], { handle }).then(
+      (r) => setAcc({ handle: r.handle, phase: 'on', read: r, readAt: Date.now() }),
+      (e) => {
+        const code = e instanceof AgentCallError ? e.code : 'server';
+        if (code === 'no_key' || code === 'not_configured') { mock(); return; }
+        setAcc({ handle, phase: 'idle' });
+        this.toast(code === 'not_found' ? 'I couldn\'t find ' + pl + ' ' + handle + '. Check the handle.' : 'I couldn\'t connect that account. Try again.');
+      },
+    );
   }
 
   formFill() {
@@ -875,11 +944,14 @@ export class AgencyApp extends Component<AppProps, AppState> {
       this.toast('Saved.');
       return;
     }
-    const fAccs = Object.entries<any>(f.accs || {}).filter(([, a]) => a.phase === 'on').map(([platform, a]) => ({ id: uid('a'), platform: platform as any, handle: a.handle, mode: 'live' as const, status: 'ok' as const, updated: 0 }));
-    const t: Talent = { id: uid('t'), name: f.name.trim(), niche: f.niche.trim(), story: f.story.trim(), pic: f.pic, color: f.color || this.nextColor(), tint: TINTS[this.state.talents.length % TINTS.length], accounts: fAccs, stats: fAccs.length ? { posts: [6, 4], views: [5200, 4100], eng: [6.1, 5.5], time: [40, 31], taken: MONTHS[new Date().getMonth()] + ' ' + new Date().getDate() } : null, ideas: [], brands: [], few: true, growLoaded: false, scoutLoaded: false };
+    const onAccs = Object.entries<any>(f.accs || {}).filter(([, a]) => a.phase === 'on');
+    const fAccs: Account[] = onAccs.map(([platform, a]) => ({ id: uid('a'), platform: platform as any, ...(a.read ? { ...this.readFields(a.read), readAt: a.readAt } : { handle: a.handle, mode: 'live' as const, status: 'ok' as const, updated: 0 }) }));
+    const real = combineStats(fAccs);
+    const few = onAccs.some(([, a]) => a.read) ? onAccs.some(([, a]) => a.read?.few) : true;
+    const t: Talent = { id: uid('t'), name: f.name.trim(), niche: f.niche.trim(), story: f.story.trim(), pic: f.pic, color: f.color || this.nextColor(), tint: TINTS[this.state.talents.length % TINTS.length], accounts: fAccs, stats: real || (fAccs.length ? { posts: [6, 4], views: [5200, 4100], eng: [6.1, 5.5], time: [40, 31], taken: MONTHS[new Date().getMonth()] + ' ' + new Date().getDate() } : null), ideas: [], brands: [], few, growLoaded: false, scoutLoaded: false };
     // Signed in with real agents: Scout writes the brand ideas when the Scout tab opens.
     t.brands = this.state.cloud && this._agentsOn ? [] : genBrands(t).map((b) => ({ ...b, flagged: false }));
-    if (fAccs.length) t.ideas = starterIdeas(t).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
+    if (fAccs.length && !(real && this._agentsOn)) t.ideas = starterIdeas(t).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
     this.setState((s) => ({ talents: s.talents.concat([t]), draft: null }));
     this.go('talent', { talentId: t.id, tab: 'overview', _saved: true, draft: null });
     this.toast(t.name + ' was added.' + (fAccs.length ? '' : ' Next, connect an account.'));
