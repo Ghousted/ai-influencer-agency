@@ -29,12 +29,17 @@ export class Syncer {
   private saved: { talents: Map<string, Talent>; pitches: Map<string, Pitch>; posts: Map<string, ScheduledPost>; draft: string };
   private pending: Snapshot | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private failures = 0;
   private stopped = false;
-  private running: Promise<void> = Promise.resolve();
+  private running: Promise<unknown> = Promise.resolve();
 
-  constructor(start: CloudData & { draft?: unknown }, private onError: (message: string) => void, private onSaved?: () => void) {
+  constructor(start: CloudData & { draft?: unknown }, private notify: (message: string) => void, private onSaved?: () => void) {
     this.saved = { talents: byId(start.talents), pitches: byId(start.pitches), posts: byId(start.posts), draft: JSON.stringify(start.draft ?? null) };
   }
+
+  /** Changes that are not in the database yet (waiting, or a save that failed). */
+  get dirty() { return !!this.pending; }
 
   /** Save soon. Many quick changes become one write. */
   schedule(next: Snapshot) {
@@ -44,14 +49,14 @@ export class Syncer {
     this.timer = setTimeout(() => this.flush(), 600);
   }
 
-  /** Save now, after any save already running. */
-  flush(): Promise<void> {
+  /** Save now, after any save already running. Resolves true when everything is saved. */
+  flush(): Promise<boolean> {
     clearTimeout(this.timer);
+    clearTimeout(this.retryTimer);
     const next = this.pending;
     this.pending = null;
-    if (!next) return this.running;
-    this.running = this.running.then(() => this.push(next)).catch(() => {});
-    return this.running;
+    if (next) this.running = this.running.then(() => this.push(next)).catch(() => {});
+    return this.running.then(() => !this.pending);
   }
 
   /** Stop saving: drop what is waiting (account deleted, or the agency loads again). */
@@ -59,6 +64,7 @@ export class Syncer {
     this.stopped = true;
     this.pending = null;
     clearTimeout(this.timer);
+    clearTimeout(this.retryTimer);
   }
 
   private async push(next: Snapshot) {
@@ -95,10 +101,17 @@ export class Syncer {
       }
       this.saved = { talents: byId(next.talents), pitches: byId(next.pitches), posts: byId(next.posts), draft };
     } catch {
-      // Keep the old snapshot, so the next change tries these rows again.
-      this.onError('The app could not save your last change. It will try again with your next change.');
+      if (this.stopped) return;
+      // Keep the old snapshot and try again later: 5 s, 10 s, 20 s … up to 1 minute.
+      if (!this.pending) this.pending = next;
+      this.failures++;
+      if (this.failures === 1) this.notify('The app could not save your last change. It will keep trying.');
+      clearTimeout(this.retryTimer);
+      this.retryTimer = setTimeout(() => this.flush(), Math.min(60000, 5000 * 2 ** (this.failures - 1)));
       return;
     }
+    if (this.failures) this.notify('Your changes are saved.');
+    this.failures = 0;
     this.onSaved?.();
   }
 }
