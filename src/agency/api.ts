@@ -4,7 +4,7 @@ import type { AccountStats, Brand, ContentIdea, Platform, Talent } from './types
 
 export type AgentErrorCode =
   | 'bad_request' | 'needs_account' | 'no_key' | 'timeout' | 'upstream' | 'bad_output'
-  | 'not_found' | 'not_configured' | 'unauthorized' | 'server' | 'network';
+  | 'not_found' | 'not_configured' | 'reconnect' | 'wrong_origin' | 'unauthorized' | 'server' | 'network';
 
 export class AgentCallError extends Error {
   constructor(public code: AgentErrorCode, message: string) {
@@ -26,14 +26,14 @@ function talentPayload(t: Talent) {
   };
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, method = 'POST'): Promise<T> {
   const token = await accessToken();
   let res: Response;
   try {
     res = await fetch(path, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new AgentCallError('network', 'Could not reach the server.');
@@ -84,15 +84,25 @@ export const accounts = {
    * Fails with `not_configured` for a platform the server cannot read yet, and `not_found` when no account has that handle.
    */
   read: (platform: Platform, by: { handle?: string; ref?: string }) => post<AccountRead>('/api/accounts/read', { platform, ...by }),
+
+  /**
+   * Start Instagram's login page for a talent. The browser leaves the app; the callback brings it back
+   * with ?connected=Instagram&tid&re&ref (or ?connect_error=…). Fails with `wrong_origin` when the app
+   * is not open at APP_URL.
+   */
+  startInstagram: (tid: string, reId: string | null) => post<{ url: string }>('/api/connect/instagram/start', { tid, reId }),
+
+  /** Forget the server's Instagram token for an account the student disconnected. */
+  forgetInstagram: (ref: string) => post<{ ok: true }>(`/api/connect/instagram?ref=${encodeURIComponent(ref)}`, undefined, 'DELETE'),
 };
 
-/** Whether the server has an OpenRouter key. */
-export async function agentsConfigured() {
+/** What the server is set up for: the real agents (an OpenRouter key), and the platforms it reads. */
+export async function serverStatus(): Promise<{ agents: boolean; live: Platform[] }> {
   try {
     const res = await fetch('/api/health');
     const data = await res.json();
-    return !!data?.openrouter?.configured;
+    return { agents: !!data?.openrouter?.configured, live: Array.isArray(data?.accounts?.live) ? data.accounts.live : [] };
   } catch {
-    return false;
+    return { agents: false, live: [] };
   }
 }
