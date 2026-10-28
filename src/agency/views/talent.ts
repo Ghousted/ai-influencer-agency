@@ -58,7 +58,9 @@ function accountRows(app: AgencyApp, t: Talent) {
       disconnect: () => app.setState({ ov: { kind: 'delAcct', tid: t.id, aid: a.id, platform: a.platform, handle: a.handle } }),
     };
   };
-  return PLATFORMS.map((p) => {
+  // Platforms with an account come first; each group keeps the PLATFORMS order.
+  const order = [...PLATFORMS].sort((a, b) => Number(!t.accounts.some((x) => x.platform === a)) - Number(!t.accounts.some((x) => x.platform === b)));
+  return order.map((p) => {
     const list = t.accounts.filter((a) => a.platform === p);
     const on = list.length > 0;
     const anyLost = list.some((a) => a.mode === 'live' && a.status === 'lost');
