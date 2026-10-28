@@ -86,14 +86,16 @@ export const accounts = {
   read: (platform: Platform, by: { handle?: string; ref?: string }) => post<AccountRead>('/api/accounts/read', { platform, ...by }),
 
   /**
-   * Start Instagram's login page for a talent. The browser leaves the app; the callback brings it back
-   * with ?connected=Instagram&tid&re&ref (or ?connect_error=…). Fails with `wrong_origin` when the app
-   * is not open at APP_URL.
+   * Start a platform's login page (Instagram, Facebook) for a talent. The browser leaves the app; the callback
+   * brings it back with ?connected=<Platform>&tid&re&ref=<id,id> (or ?connect_error=…). Fails with
+   * `wrong_origin` when the app is not open at APP_URL.
    */
-  startInstagram: (tid: string, reId: string | null) => post<{ url: string }>('/api/connect/instagram/start', { tid, reId }),
+  startLogin: (platform: Platform, tid: string, reId: string | null) =>
+    post<{ url: string }>(`/api/connect/${platform.toLowerCase()}/start`, { tid, reId }),
 
-  /** Forget the server's Instagram token for an account the student disconnected. */
-  forgetInstagram: (ref: string) => post<{ ok: true }>(`/api/connect/instagram?ref=${encodeURIComponent(ref)}`, undefined, 'DELETE'),
+  /** Forget the server's token for an account the student disconnected. */
+  forget: (platform: Platform, ref: string) =>
+    post<{ ok: true }>(`/api/connect/${platform.toLowerCase()}?ref=${encodeURIComponent(ref)}`, undefined, 'DELETE'),
 };
 
 /** What the server is set up for: the real agents (an OpenRouter key), and the platforms it reads. */

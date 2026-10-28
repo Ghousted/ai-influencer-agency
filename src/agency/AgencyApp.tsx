@@ -72,6 +72,9 @@ export type AppState = {
   authBusy?: boolean;
 };
 
+/** Platforms that connect through their own login page instead of by handle. */
+const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook'];
+
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 const ACCOUNT_KEYS = ['user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 
@@ -764,38 +767,58 @@ export class AgencyApp extends Component<AppProps, AppState> {
     return { handle: r.handle, ref: r.ref, mode: 'live', status: 'ok', readAt: Date.now(), updated: 0, stats: r.stats };
   }
 
-  /** Connect (or reconnect) the account in the connect overlay. YouTube is read by its handle. */
+  /**
+   * Connect (or reconnect) the account in the connect overlay. YouTube is read by its handle; Instagram and
+   * Facebook go through their login page first, which comes back with one ref or more (Facebook: one per Page).
+   */
   connectNow() {
     const o = this.state.ov;
     if (!o) return;
-    // Instagram connects through its own login page; `o.ref` is set once that page sends the student back.
-    if (o.platform === 'Instagram' && !o.ref) { this.startLogin(o); return; }
+    if (LOGIN_PLATFORMS.includes(o.platform) && !o.ref) { this.startLogin(o); return; }
     const t0 = this.T(o.tid);
     const re = o.reId ? t0?.accounts.find((a) => a.id === o.reId) : undefined;
-    // A ref from a login page wins, then a handle typed in the overlay; a reconnect without either reads the same account again.
+    // Refs from a login page win, then a handle typed in the overlay; a reconnect without either reads the same account again.
     const typed = (o.handle || '').trim();
-    const by = o.ref ? { ref: o.ref as string } : typed ? { handle: typed } : re?.ref ? { ref: re.ref } : { handle: re?.handle || '' };
-    if (this.state.cloud && o.platform === 'YouTube' && !by.handle && !by.ref) return;
+    const reads: { handle?: string; ref?: string }[] = o.ref
+      ? String(o.ref).split(',').map((ref) => ({ ref }))
+      : [typed ? { handle: typed } : re?.ref ? { ref: re.ref } : { handle: re?.handle || '' }];
+    if (this.state.cloud && o.platform === 'YouTube' && !reads[0].handle && !reads[0].ref) return;
     // Closing the overlay while it connects cancels the connect.
     const open = () => this.state.ov?.kind === 'connect';
-    this.liveJob('connect', () => accounts.read(o.platform, by), (r) => {
+    this.liveJob('connect', () => Promise.all(reads.map((by) => accounts.read(o.platform, by))), (rs) => {
       if (!open()) return;
-      this.upd(o.tid, (t) => {
-        // Connecting an account the talent already has updates it instead of adding a copy.
-        const same = t.accounts.find((a) => a.platform === o.platform && a.ref === r.ref);
-        const target = o.reId || same?.id;
-        const accs = target
-          ? t.accounts.map((a) => (a.id === target ? { ...a, ...this.readFields(r) } : a))
-          : t.accounts.concat([{ id: uid('a'), platform: o.platform, ...this.readFields(r) }]);
-        // The real Grow agent writes the first ideas when the Grow tab opens.
-        return { ...this.withAccounts(t, accs), few: r.few, growLoaded: t.ideas.length ? t.growLoaded : false };
-      });
-      this.setState({ ov: null });
-      this.toast((o.reId ? 'Reconnected ' : 'Connected ') + o.platform + ' ' + r.handle + '.');
+      // Facebook returns every Page the student ever shared with the app, so the student picks this talent's Page.
+      if (rs.length > 1) { this.setState((s) => ({ ov: { ...s.ov, pick: rs } })); return; }
+      this.addReads(o, rs);
     }, () => { if (open()) this.mockConnect(o); }, () => {
       // After a login page, Try again must open the login page again, not repeat this read.
       if (o.ref && open()) this.setState((s) => ({ ov: { ...s.ov, ref: null } }));
     });
+  }
+
+  /** Add (or update) the accounts from real reads on the overlay's talent, then close the overlay. */
+  private addReads(o: any, rs: AccountRead[]) {
+    this.upd(o.tid, (t) => {
+      let accs = t.accounts;
+      rs.forEach((r, i) => {
+        // A reconnect updates its account; connecting an account the talent already has updates it instead of adding a copy.
+        const target = (i === 0 && o.reId) || accs.find((a) => a.platform === o.platform && a.ref === r.ref)?.id;
+        accs = target
+          ? accs.map((a) => (a.id === target ? { ...a, ...this.readFields(r) } : a))
+          : accs.concat([{ id: uid('a'), platform: o.platform, ...this.readFields(r) }]);
+      });
+      // The real Grow agent writes the first ideas when the Grow tab opens.
+      return { ...this.withAccounts(t, accs), few: rs.every((r) => r.few), growLoaded: t.ideas.length ? t.growLoaded : false };
+    });
+    this.setState({ ov: null });
+    this.toast((o.reId ? 'Reconnected ' : 'Connected ') + o.platform + ' ' + rs.map((r) => r.handle).join(' and ') + '.');
+  }
+
+  /** The student picked which of the returned accounts (Facebook Pages) belongs to this talent. */
+  pickAccount(i: number) {
+    const o = this.state.ov;
+    const r = o?.pick?.[i];
+    if (r) this.addReads(o, [r]);
   }
 
   /**
@@ -806,7 +829,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const open = () => this.state.ov?.kind === 'connect';
     this.liveJob('connect', async () => {
       await this._sync?.flush();
-      return accounts.startInstagram(o.tid, o.reId || null);
+      return accounts.startLogin(o.platform, o.tid, o.reId || null);
     }, (r) => {
       if (open()) window.location.assign(r.url);
     }, () => { if (open()) this.mockConnect(o); }, (code, message) => {
@@ -848,6 +871,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       jobs: { ...s.jobs, connect: { phase: r.error ? 'failed' : 'idle' } },
     }), () => {
       if (r.error === 'denied') this.toast(r.platform + ' was not connected. You can try again.');
+      if (r.error === 'no_pages') this.toast('No Facebook Page was shared. Try again and pick a Page you manage.');
       if (!r.error) this.connectNow();
     });
   }
@@ -911,12 +935,12 @@ export class AgencyApp extends Component<AppProps, AppState> {
     if (a) this.toast(a.platform + ' ' + a.handle + ' was removed.');
   }
 
-  /** The server forgets an Instagram token once no other talent uses that account. `tid` is the talent losing them. */
+  /** The server forgets a login platform's token once no other talent uses that account. `tid` is the talent losing them. */
   private forgetUnused(gone: Account[], tid: string) {
     for (const a of gone) {
-      if (a.platform !== 'Instagram' || !a.ref) continue;
-      const used = this.state.talents.some((x) => x.id !== tid && x.accounts.some((y) => y.platform === 'Instagram' && y.ref === a.ref));
-      if (!used) accounts.forgetInstagram(a.ref).catch(() => {});
+      if (!LOGIN_PLATFORMS.includes(a.platform) || !a.ref) continue;
+      const used = this.state.talents.some((x) => x.id !== tid && x.accounts.some((y) => y.platform === a.platform && y.ref === a.ref));
+      if (!used) accounts.forget(a.platform, a.ref).catch(() => {});
     }
   }
 
@@ -982,10 +1006,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
     setAcc({ handle, phase: 'loading' });
     const mock = () => setTimeout(() => setAcc({ handle, phase: 'on' }), 1100);
     if (!this.state.cloud || (this.props.simulate ?? 'normal') !== 'normal') { mock(); return; }
-    // A login page would leave the form, so Instagram connects after the talent is saved.
-    if (pl === 'Instagram' && this._live.includes('Instagram')) {
+    // A login page would leave the form, so these platforms connect after the talent is saved.
+    if (LOGIN_PLATFORMS.includes(pl as Platform) && this._live.includes(pl as Platform)) {
       setAcc({ handle, phase: 'idle' });
-      this.toast('Save the AI talent first. Then connect Instagram on its Accounts tab.');
+      this.toast('Save the AI talent first. Then connect ' + pl + ' on its Accounts tab.');
       return;
     }
     // Signed in: read the account for real. The numbers are kept until the talent is saved.
