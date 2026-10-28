@@ -122,13 +122,13 @@ export function HomeScreen({ v }: { v: any }) {
                   <div style={{ flex: "2 1 520px", minWidth: "0", background: "#fff", borderRadius: "20px", padding: "20px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "14px" }}>
                     <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                       <h2 style={{ margin: "0", font: "800 16px 'Plus Jakarta Sans',sans-serif" }}>
-                        Views each day
+                        {home.chartTitle}
                       </h2>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                         {(home.legend || []).map((l: any, l_i: number) => (
                           <Fragment key={l_i}>
                             <button style={{ height: "34px", display: "flex", alignItems: "center", gap: "8px", padding: "0 12px 0 5px", border: "none", borderRadius: "9999px", background: l.bg, boxShadow: `0 0 0 1px ${l.bd}`, font: "700 12px 'Plus Jakarta Sans',sans-serif", color: l.fg, cursor: "pointer", transition: "background .15s,opacity .15s" }} onClick={l.toggle} aria-pressed={l.on} title={l.tip} className="dc-h32">
-                              <span style={{ width: "24px", height: "24px", borderRadius: "9999px", flexShrink: "0", backgroundColor: "#EAF2FF", backgroundImage: l.picBg, backgroundSize: "cover", backgroundPosition: "center", boxShadow: `0 0 0 2px #fff,0 0 0 4px ${l.ring}`, filter: l.filter }} />
+                              <span style={{ width: "24px", height: "24px", borderRadius: "9999px", flexShrink: "0", backgroundColor: "#fff", backgroundImage: l.picBg, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", boxShadow: `0 0 0 2px #fff,0 0 0 4px ${l.ring}`, filter: l.filter }} />
                               {l.name}
                             </button>
                           </Fragment>
@@ -187,7 +187,7 @@ export function HomeScreen({ v }: { v: any }) {
                             {(home.hov.rows || []).map((hr: any, hr_i: number) => (
                               <Fragment key={hr_i}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <span style={{ width: "20px", height: "20px", borderRadius: "9999px", flexShrink: "0", backgroundColor: hr.color, backgroundImage: hr.picBg, backgroundSize: "cover", backgroundPosition: "center", boxShadow: `0 0 0 2px ${hr.color}` }} />
+                                  <span style={{ width: "20px", height: "20px", borderRadius: "9999px", flexShrink: "0", backgroundColor: hr.color, backgroundImage: hr.picBg, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", boxShadow: `0 0 0 2px ${hr.color}` }} />
                                   <span style={{ flex: "1", font: "600 13px 'Plus Jakarta Sans',sans-serif" }}>
                                     {hr.name}
                                   </span>
@@ -211,7 +211,7 @@ export function HomeScreen({ v }: { v: any }) {
                         {(home.noLines) ? (
                           <>
                           <div style={{ position: "absolute", inset: "0", display: "flex", alignItems: "center", justifyContent: "center", font: "600 13px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
-                            Press an AI talent above to show its line.
+                            {home.noPlatforms ? 'No platform numbers yet.' : 'Press a platform above to show its line.'}
                           </div>
                           </>
                         ) : null}

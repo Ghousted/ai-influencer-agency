@@ -1,6 +1,6 @@
 // Mock data and text generators, ported from the design prototype.
 // The Grow, Scout, Content and Pitch agents are simulated here until the real agents exist.
-import type { Account, Brand, ContentIdea, Idea, Pair, Pitch, ScheduledPost, Stats, Talent } from './types';
+import type { Account, Brand, ContentIdea, Idea, Pair, Pitch, Platform, ScheduledPost, Stats, Talent } from './types';
 
 export const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -16,6 +16,49 @@ export const LOGO: Record<string, string> = {
   Facebook: '/assets/p-facebook.png',
   YouTube: '/assets/p-youtube.png',
 };
+/** Line color of each platform in the views charts. */
+export const PLATFORM_COLOR: Record<string, string> = { Facebook: '#1877F2', Instagram: '#E1306C', TikTok: '#18181b', YouTube: '#FF0000' };
+
+/**
+ * Views of the posts from each of the last 7 days (ending today), per platform, and the 7 days before
+ * (`prev`). Accounts read for real add up their posts (the platforms share views per post, not per day).
+ * Simulated accounts get a seeded split of the talent's views.
+ */
+export function dailyByPlatform(t: Talent) {
+  const dayOf = (ms: number) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const back = (ms: number, n: number) => { const d = new Date(ms); d.setDate(d.getDate() - n); return d.getTime(); };
+  const days = Array.from({ length: 7 }, (_, i) => back(dayOf(Date.now()), 6 - i));
+  const labels = days.map((d) => DOW[new Date(d).getDay()]);
+  const live = t.accounts.filter((a) => a.mode === 'live');
+  const real = live.length > 0 && live.every((a) => a.stats);
+  // Accounts read before the app kept posts have none until their next read.
+  const stale = real && !live.some((a) => a.recent);
+  const by: Record<string, { now: number[]; prev: number[] }> = {};
+  const add = (pl: string, now: number[], prev: number[]) => {
+    const b = (by[pl] = by[pl] || { now: days.map(() => 0), prev: days.map(() => 0) });
+    now.forEach((v, i) => { b.now[i] += v; b.prev[i] += prev[i]; });
+  };
+  if (real) {
+    for (const a of live) {
+      const sumOn = (day: number) => (a.recent || []).filter((p) => dayOf(p.at) === day).reduce((n, p) => n + p.views, 0);
+      add(a.platform, days.map(sumOn), days.map((d) => sumOn(back(d, 7))));
+    }
+  } else if (t.stats && live.length) {
+    let seed = 0;
+    for (const ch of t.id) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
+    const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    const split = (tot: number, k: number) => {
+      const ws = Array.from({ length: k }, () => 0.6 + rnd());
+      const sm = ws.reduce((a, b) => a + b, 0);
+      return ws.map((w) => tot * w / sm);
+    };
+    const now = split(t.stats.views[0], 7), prev = split(t.stats.views[1], 7);
+    const share = split(1, live.length).sort((a, b) => b - a);
+    live.forEach((a, i) => add(a.platform, now.map((v) => Math.round(v * share[i])), prev.map((v) => Math.round(v * share[i]))));
+  }
+  const lines = PLATFORMS.filter((pl) => by[pl]).map((pl) => ({ platform: pl as Platform, ...by[pl] }));
+  return { real, stale, labels, lines };
+}
 
 let _n = 100;
 export const uid = (p: string) => p + (_n++) + Math.random().toString(36).slice(2, 6);

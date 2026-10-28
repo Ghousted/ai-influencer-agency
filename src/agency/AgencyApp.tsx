@@ -5,7 +5,7 @@
 import { Component, type ChangeEvent } from 'react';
 import {
   HOUR, MONTHS, PLATFORMS, TCOLORS, TINTS, addDays, demoData, dlong, draftFromAccounts, first, fmt,
-  combineStats, genBrands, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
+  combineStats, dailyByPlatform, genBrands, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
   seedCalendar, starterIdeas, tstr, uid, ymd,
 } from './logic';
 import type { Account, ContentIdea, Idea, Job, Pitch, Platform, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
@@ -64,6 +64,8 @@ export type AppState = {
   colorOpen?: boolean;
   homeHover?: number | null;
   homeHidden?: Record<string, boolean>;
+  /** Platforms left out of the AI talent's views-each-day chart. */
+  anHidden?: Record<string, boolean>;
   /** Free-form UI state used by individual screens. */
   ui: Record<string, any>;
   /** Signed in through Supabase (not the local demo). */
@@ -1229,23 +1231,20 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const stale = real && !live.some((a) => a.recent);
     const posts = real ? live.flatMap((a) => a.recent || []) : [];
 
-    // Views each day: real accounts add up the views of the posts from each day (the platforms share
-    // views per post, not per day). The 7 days end today; the dashed line is the 7 days before.
-    const dayOf = (ms: number) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+    // Views each day, added up over the platforms that are on. Press a platform chip to leave it out.
     const dayIx = (ms: number) => (new Date(ms).getDay() + 6) % 7;
-    let now: number[], prev: number[], labels: string[];
-    if (real) {
-      const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(dayOf(Date.now())); d.setDate(d.getDate() - (6 - i)); return d.getTime(); });
-      const weekAgo = (ms: number) => { const d = new Date(ms); d.setDate(d.getDate() - 7); return d.getTime(); };
-      const sumOn = (day: number) => posts.filter((p) => dayOf(p.at) === day).reduce((n, p) => n + p.views, 0);
-      now = days.map(sumOn);
-      prev = days.map((d) => sumOn(weekAgo(d)));
-      labels = days.map((d) => DN[dayIx(d)]);
-    } else {
-      now = split(t.stats.views[0], 7);
-      prev = split(t.stats.views[1], 7);
-      labels = DN;
-    }
+    const daily = dailyByPlatform(t);
+    const labels = daily.labels;
+    const off = this.state.anHidden || {};
+    const on = daily.lines.filter((l) => !off[l.platform]);
+    const now = labels.map((_, i) => on.reduce((n, l) => n + l.now[i], 0));
+    const prev = labels.map((_, i) => on.reduce((n, l) => n + l.prev[i], 0));
+    const dayChips = daily.lines.length < 2 ? [] : daily.lines.map(({ platform: pl }) => ({
+      name: pl, logoBg: LOGO[pl] ? 'url(' + LOGO[pl] + ')' : 'none', on: !off[pl],
+      bg: off[pl] ? '#F4F4F5' : '#fff', bd: off[pl] ? 'transparent' : '#E4E4E7', fg: off[pl] ? '#A1A1AA' : '#18181b',
+      filter: off[pl] ? 'grayscale(1) opacity(.6)' : 'none', tip: (off[pl] ? 'Show ' : 'Hide ') + pl,
+      toggle: () => this.setState((s) => ({ anHidden: { ...(s.anHidden || {}), [pl]: !(s.anHidden || {})[pl] } })),
+    }));
     const peak = Math.max(...now, ...prev, 10);
     const step = Math.pow(10, Math.floor(Math.log10(peak)));
     let top = Math.ceil(peak / step) * step;
@@ -1259,7 +1258,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }).join(' ');
     const nowD = sm(now.map((v, d) => [X(d), Y(v)])), prevD = sm(prev.map((v, d) => [X(d), Y(v)]));
     const bi = now.indexOf(Math.max(...now));
-    const dayNote = stale ? 'Refresh the accounts to see the views of each day.'
+    const dayNote = !on.length ? 'Press a platform above to show its views.'
+      : stale ? 'Refresh the accounts to see the views of each day.'
       : real && !now[bi] ? 'No views on posts from the last 7 days yet.'
       : real ? 'Best day: ' + labels[bi] + '. Posts from that day got ' + fmt(now[bi]) + ' views.'
       : 'Best day: ' + labels[bi] + ', with ' + fmt(now[bi]) + ' views.';
@@ -1332,7 +1332,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       chartTitle: real ? 'Views by the day posted' : 'Views each day',
       pts: now.map((v, d) => ({ x: (X(d) / 600 * 100).toFixed(2) + '%', y: (Y(v) / 200 * 100).toFixed(2) + '%', tip: labels[d] + ': ' + fmt(v) + ' views (last week ' + fmt(prev[d]) + ')' })),
       days: labels.map((l, d) => ({ l, x: (X(d) / 600 * 100).toFixed(2) + '%', c: d === bi ? col : '#71717a' })),
-      dayNote,
+      dayNote, dayChips, hasDayChips: dayChips.length > 0,
       plats, hasHandleOnly: handle.length > 0, handleNote: handle.map((a) => a.platform).join(', ') + ' is added by handle, so it shares no numbers.',
       top: topPosts, noTop: !topPosts.length, topEmpty: real && !live.some((a) => a.top) ? 'Refresh the accounts to see this week\'s top posts.' : 'No posts this week yet.',
       dowL: DN.map((d) => d[0]), heat, best: bestText,
