@@ -845,17 +845,30 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   setPost(pid: string, patch: Partial<ScheduledPost> | null, msg?: string) {
     const p = this.state.posts.find((x) => x.id === pid);
+    const at = this.state.posts.findIndex((x) => x.id === pid);
+    const c0 = p && p.contentId ? (this.T(p.talentId)?.content || []).find((c) => c.id === p.contentId) : undefined;
     this.setState((s) => ({
       posts: patch ? s.posts.map((x) => (x.id === pid ? { ...x, ...patch } : x)) : s.posts.filter((x) => x.id !== pid),
       talents: p && p.contentId ? s.talents.map((t) => (t.id !== p.talentId ? t : { ...t, content: (t.content || []).map((c) => (c.id !== p.contentId ? c : { ...c, status: patch && patch.status === 'posted' ? 'posted' as const : patch ? c.status : 'new' as const, date: Date.now() })) })) : s.talents,
     }));
-    if (msg) this.toast(msg);
+    if (!msg) return;
+    // Undo puts the post (and its content idea) back as they were.
+    this.toast(msg, p ? { label: 'Undo', run: () => {
+      this.setState((s) => {
+        const posts = s.posts.some((x) => x.id === pid) ? s.posts.map((x) => (x.id === pid ? p : x)) : [...s.posts.slice(0, at), p, ...s.posts.slice(at)];
+        const talents = c0 ? s.talents.map((t) => (t.id !== p.talentId ? t : { ...t, content: (t.content || []).map((c) => (c.id === c0.id ? c0 : c)) })) : s.talents;
+        return { posts, talents };
+      });
+      this.toast('Undone.');
+    } } : undefined);
   }
 
   // ---- Content and Grow ------------------------------------------------------------
   setContent(tid: string, cid: string, status: ContentIdea['status']) {
+    const c0 = (this.T(tid)?.content || []).find((c) => c.id === cid);
     this.upd(tid, (t) => ({ ...t, content: (t.content || []).map((c) => (c.id === cid ? { ...c, status, date: Date.now() } : c)) }));
-    this.toast(status === 'planned' ? 'Added to your plan.' : status === 'posted' ? 'Marked as posted.' : 'Dismissed. The app will not show this idea again.');
+    const undo = c0 ? { label: 'Undo', run: () => { this.upd(tid, (t) => ({ ...t, content: (t.content || []).map((c) => (c.id === cid ? c0 : c)) })); this.toast('Undone.'); } } : undefined;
+    this.toast(status === 'planned' ? 'Added to your plan.' : status === 'posted' ? 'Marked as posted.' : 'Dismissed. You can bring it back from History.', undo);
   }
 
   /** Copy, then say "Copied" or tell the student to copy the text by hand. */
@@ -875,8 +888,18 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   setIdea(tid: string, iid: string, status: 'done' | 'dismissed') {
+    const i0 = this.T(tid)?.ideas.find((i) => i.id === iid);
     this.upd(tid, (t) => ({ ...t, ideas: t.ideas.map((i) => (i.id === iid ? { ...i, status, date: Date.now() } : i)) }));
-    this.toast(status === 'done' ? 'Marked as done.' : 'Dismissed. The app will not show this idea again.');
+    const undo = i0 ? { label: 'Undo', run: () => { this.upd(tid, (t) => ({ ...t, ideas: t.ideas.map((i) => (i.id === iid ? i0 : i)) })); this.toast('Undone.'); } } : undefined;
+    this.toast(status === 'done' ? 'Marked as done.' : 'Dismissed. You can bring it back from History.', undo);
+  }
+
+  /** History: bring a dismissed growth or content idea back to its tab. */
+  restoreIdea(tid: string, id: string, kind: 'idea' | 'content') {
+    this.upd(tid, (t) => (kind === 'idea'
+      ? { ...t, ideas: t.ideas.map((i) => (i.id === id ? { ...i, status: 'new' as const, date: Date.now() } : i)) }
+      : { ...t, content: (t.content || []).map((c) => (c.id === id ? { ...c, status: 'new' as const, date: Date.now() } : c)) }));
+    this.toast('The idea is back.');
   }
 
   // ---- Pitch ----------------------------------------------------------------------

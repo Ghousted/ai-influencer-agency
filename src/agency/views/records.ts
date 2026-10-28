@@ -101,8 +101,13 @@ function historyRows(app: AgencyApp): Row[] {
     return { ...base(t), title, type, status: label, statusColor: color, date, dateText: dstr(date), hasNote: !!note, noteText: note, flagged: !!x.flagged, open };
   };
   s.talents.forEach((t) => {
-    t.ideas.forEach((i) => rows.push(mk(t, i.title, 'Idea', i.status, i.date, i, () => app.openTalent(t.id, 'grow'))));
-    (t.content || []).forEach((c) => rows.push(mk(t, c.title, 'Content idea', c.status, c.date, c, () => app.openTalent(t.id, 'content'))));
+    // A dismissed idea opens its tab with a Restore button in the message.
+    const openOrRestore = (tab: 'grow' | 'content', kind: 'idea' | 'content', x: { id: string; title: string; status: string }) => () => {
+      app.openTalent(t.id, tab);
+      if (x.status === 'dismissed') app.toast('"' + x.title + '" was dismissed.', { label: 'Restore', run: () => app.restoreIdea(t.id, x.id, kind) });
+    };
+    t.ideas.forEach((i) => rows.push(mk(t, i.title, 'Idea', i.status, i.date, i, openOrRestore('grow', 'idea', i))));
+    (t.content || []).forEach((c) => rows.push(mk(t, c.title, 'Content idea', c.status, c.date, c, openOrRestore('content', 'content', c))));
     t.brands.filter((b) => b.flagged).forEach((b) => {
       const d = b.flagDate || Date.now();
       rows.push({ ...base(t), title: b.name, type: 'Brand idea', status: 'Flagged', statusColor: '#B91C1C', date: d, dateText: dstr(d), hasNote: !!b.flagNote, noteText: b.flagNote ? 'Flag note: ' + b.flagNote : '', flagged: true, open: () => app.openTalent(t.id, 'scout') });
