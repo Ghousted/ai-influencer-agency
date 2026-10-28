@@ -103,7 +103,7 @@ export function homeView(app: AgencyApp) {
     ? mk('Time spent watching' + (timeMissing ? ' *' : ''), tNow, tPrev, fmt(tNow) + ' h', fmt(tPrev) + ' h')
     : { ...mk('Time spent watching', 0, 0, 'Not available', 'not available'), hasPct: false, prev: 'These platforms do not share it' };
   const totals = [
-    mk('Views', vNow, vPrev, fmt(vNow)!, fmt(vPrev)!),
+    mk("Views on this week's posts", vNow, vPrev, fmt(vNow)!, fmt(vPrev)!),
     mk('Posts', sum('posts', 0), sum('posts', 1), fmt(sum('posts', 0))!, fmt(sum('posts', 1))!),
     mk('Average engagement', engAvg, engPrev, engAvg + '%', engPrev + '%', true),
     timeCard,
@@ -195,7 +195,7 @@ export function homeView(app: AgencyApp) {
     return {
       hasNumbers: numbers.length > 0, numbers: numbers.join(' · '),
       name: t.name, tint: t.tint, hasPic: !!t.pic, noPic: !t.pic, picBg: picBg(t), initials: initials(t.name),
-      views: v ? v.views + ' views this week' : t.accounts.length ? 'No numbers yet' : 'No account yet',
+      views: v ? v.views + " views on this week's posts" : t.accounts.length ? 'No numbers yet' : 'No account yet',
       hasV: !!v, delta: v ? v.delta : '', color: v ? v.color : '#71717a', rot: v ? v.rot : 'none', arrow: v ? v.arrow : 'none',
       open: () => app.openTalent(t.id),
     };

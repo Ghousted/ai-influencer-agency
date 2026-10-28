@@ -256,7 +256,7 @@ export function metricCards(t: Talent) {
     else { const x = Math.round((a - b) / b * 100); up = x >= 0; d = Math.abs(x) + (up ? '% more' : '% less') + ' than last week'; }
     return { label, value: (kind === 'pts' ? a + '%' : fmt(a) + (unit || '')), na: false, notNa: true, sub: '', hasDelta: !stale, delta: d, color: up ? '#006AFF' : '#B91C1C', rot: up ? 'none' : 'rotate(180deg)', chip: up ? '#EAF2FF' : '#FEECEC' };
   };
-  return [row('Posts', s.posts, 'count'), row('Views', s.views, 'pct'), row('Average engagement', s.eng, 'pts'), row('Time spent watching', s.time, 'pct', ' h')];
+  return [row('Posts', s.posts, 'count'), row("Views on this week's posts", s.views, 'pct'), row('Average engagement', s.eng, 'pts'), row('Time spent watching', s.time, 'pct', ' h')];
 }
 
 /** This week's views and the change against last week, for talent rows and cards. */
@@ -272,9 +272,10 @@ export function viewsOf(t: Talent) {
 export function pitchText(t: Talent, b: Pick<Brand, 'name' | 'why' | 'what'>, user: string, agency: string) {
   const f = first(t);
   const s = t.stats && t.accounts.some((a) => a.mode === 'live') ? t.stats : null;
-  const nums = s ? 'In the last 7 days, ' + f + ' had ' + fmt(s.views[0]) + ' views and ' + s.eng[0] + '% average engagement across ' + s.posts[0] + ' posts.\n\n' : '';
+  // The platforms share views per post, so these are the views of the posts from the last 7 days.
+  const nums = s ? f + "'s " + s.posts[0] + (s.posts[0] === 1 ? ' post' : ' posts') + ' from the last 7 days have ' + fmt(s.views[0]) + ' views so far, with ' + s.eng[0] + '% average engagement.\n\n' : '';
   const pitch = 'Hi ' + b.name + ' team,\n\nI run ' + t.name + ', an AI talent who posts about ' + t.niche.toLowerCase() + '. ' + b.why + '\n\n' + nums + 'I would love to talk about a sponsored post that shows ' + b.what.toLowerCase() + ' to ' + f + "'s audience.\n\nCould we set up a short call this week?\n\nThanks,\n" + user + '\n' + agency;
-  const profile = t.name + ' is an AI talent. ' + t.story + ' ' + f + ' posts about ' + t.niche.toLowerCase() + '.' + (s ? ' This week: ' + fmt(s.views[0]) + ' views, ' + s.eng[0] + '% average engagement.' : '');
+  const profile = t.name + ' is an AI talent. ' + t.story + ' ' + f + ' posts about ' + t.niche.toLowerCase() + '.' + (s ? ' Posts from the last 7 days: ' + fmt(s.views[0]) + ' views, ' + s.eng[0] + '% average engagement.' : '');
   return { pitch, profile };
 }
 
