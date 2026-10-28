@@ -20,3 +20,9 @@ export type AccountRead = {
   /** Very few posts: Grow gives starter ideas. */
   few: boolean;
 };
+
+/** An account's own words, for the Profile agent: its bio and the text of its newest posts. */
+export type AccountAbout = { platform: string; handle: string; bio: string; posts: string[] };
+
+/** How many of the newest posts the Profile agent reads. */
+export const ABOUT_POSTS = 15;

@@ -2,7 +2,7 @@
 // FACEBOOK_APP_SECRET and FACEBOOK_CONFIG_ID (the login configuration in the Meta app).
 // In Development mode only people with a role on the Meta app can connect their Pages.
 // Docs: https://developers.facebook.com/docs/facebook-login/facebook-login-for-business
-import { AccountError, type AccountRead } from './account-error';
+import { ABOUT_POSTS, AccountError, type AccountAbout, type AccountRead } from './account-error';
 import { cryptoConfigured } from './crypto';
 import { platformFetch, redirectUri } from './login-common';
 import { supabaseConfigured } from './supabase';
@@ -109,5 +109,22 @@ export async function readFacebook(userId: string, ref: string): Promise<Account
     ref,
     stats: { posts: [a.posts, b.posts], views: [a.views, b.views], eng: [a.eng, b.eng], time: [a.time, b.time] },
     few: recent.length < FEW_POSTS,
+  };
+}
+
+/** The Page's category and About text and the newest post text, for the Profile agent. */
+export async function aboutFacebook(userId: string, ref: string): Promise<AccountAbout> {
+  const t = await loadToken(userId, 'Facebook', ref);
+  if (!t) throw new AccountError('reconnect', 'This Facebook Page has no saved access. Connect it again.');
+  const q = (p: Record<string, string>) => new URLSearchParams({ ...p, access_token: t.token });
+  const page = await call<{ name: string; username?: string; category?: string; about?: string; description?: string }>(
+    `${GRAPH}/${ref}?${q({ fields: 'name,username,category,about,description' })}`,
+  );
+  const posts = await call<{ data?: { message?: string }[] }>(`${GRAPH}/${ref}/posts?${q({ fields: 'message', limit: String(ABOUT_POSTS) })}`);
+  return {
+    platform: 'Facebook',
+    handle: page.username ? '@' + page.username : page.name,
+    bio: [page.name, page.category, page.about, page.description].filter(Boolean).join(' — '),
+    posts: (posts.data || []).map((p) => p.message || '').filter(Boolean),
   };
 }

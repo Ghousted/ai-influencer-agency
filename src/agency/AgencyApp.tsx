@@ -1084,15 +1084,29 @@ export class AgencyApp extends Component<AppProps, AppState> {
     );
   }
 
-  formFill() {
+  /**
+   * Fill in the niche and character story from the accounts (new talent: step 2's accounts; edit: the talent's own).
+   * Signed in with the real agents, the Profile agent reads the accounts' bios and posts. Otherwise the
+   * prototype's text stands in.
+   */
+  formFill(src: { platform: string; handle: string; ref?: string }[]) {
     const f = this.state.form;
-    const accs = Object.entries<any>(f.accs || {}).filter(([, a]) => a.phase === 'on').map(([platform, a]) => ({ platform, handle: a.handle }));
-    if (!accs.length) return;
+    if (!f || !src.length || f.filling) return;
+    // The student can leave the form while it fills; the answer then goes nowhere.
+    const same = (cur: any) => !!cur && cur.mode === f.mode && cur.id === f.id;
+    const done = (d: { niche: string; story: string }) => this.setState((s) => (same(s.form)
+      ? { form: { ...s.form, filling: false, filled: src.map((a) => a.handle).join(', '), niche: d.niche, story: d.story } } : null));
+    const mock = () => setTimeout(() => done(draftFromAccounts(f.name, src)), 1600);
     this.setForm('filling', true);
-    setTimeout(() => {
-      const d = draftFromAccounts(this.state.form.name, accs);
-      this.setState((s) => (s.form ? { form: { ...s.form, filling: false, filled: accs.map((a) => a.handle).join(', '), niche: d.niche, story: d.story } } : null));
-    }, 1600);
+    if (!this.state.cloud || !this._agentsOn || (this.props.simulate ?? 'normal') !== 'normal') { mock(); return; }
+    // Fill in again must give a new story, not the one on screen.
+    const avoid = f.filled && f.story ? [f.story] : [];
+    agents.profile((f.name || '').trim() || 'This AI talent', src as { platform: Platform; handle: string; ref?: string }[], avoid).then(done, (e) => {
+      const code = e instanceof AgentCallError ? e.code : 'server';
+      if (code === 'no_key') { this._agentsOn = false; mock(); return; }
+      this.setState((s) => (same(s.form) ? { form: { ...s.form, filling: false } } : null));
+      this.toast(code === 'timeout' ? 'Filling it in took too long. Try again.' : "I couldn't fill it in from the accounts. Try again.");
+    });
   }
 
   setForm(k: string, v: any) { this.setState((s) => ({ form: { ...s.form, [k]: v } })); }
