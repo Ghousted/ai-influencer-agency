@@ -8,7 +8,8 @@ export const TCOLORS: [string, string][] = [['Blue', '#006AFF'], ['Amber', '#F59
 export const TINTS = ['#E6F0FF', '#D6E6FF', '#EAF2FF', '#CFE0FF'];
 export const HOUR = 3600000;
 export const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-export const PLATFORMS = ['TikTok', 'Instagram', 'YouTube', 'Facebook'] as const;
+/** The order the app lists the platforms in. */
+export const PLATFORMS = ['Facebook', 'Instagram', 'TikTok', 'YouTube'] as const;
 export const LOGO: Record<string, string> = {
   TikTok: '/assets/p-tiktok.png',
   Instagram: '/assets/p-instagram.png',

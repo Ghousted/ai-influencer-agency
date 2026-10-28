@@ -4,7 +4,7 @@
 // State lives here; each screen reads a plain view model built in ./views.
 import { Component, type ChangeEvent } from 'react';
 import {
-  HOUR, MONTHS, TCOLORS, TINTS, addDays, demoData, dlong, draftFromAccounts, first, fmt,
+  HOUR, MONTHS, PLATFORMS, TCOLORS, TINTS, addDays, demoData, dlong, draftFromAccounts, first, fmt,
   combineStats, genBrands, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
   seedCalendar, starterIdeas, tstr, uid, ymd,
 } from './logic';
@@ -763,7 +763,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const t = this.T(tid)!;
     const a = reAcc ? t.accounts.find((x) => x.id === reAcc) : null;
     this.clearJob('connect');
-    this.setState((s) => ({ ov: { kind: 'connect', tid, platform: a ? a.platform : (plat || 'TikTok'), chosen: !!plat, handle: '', reId: reAcc || null }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
+    this.setState((s) => ({ ov: { kind: 'connect', tid, platform: a ? a.platform : (plat || PLATFORMS[0]), chosen: !!plat, handle: '', reId: reAcc || null }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
   }
 
   /**
