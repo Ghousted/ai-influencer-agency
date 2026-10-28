@@ -28,6 +28,14 @@ function niceTop(peak: number) {
   return top;
 }
 
+/** ", updated 3 days ago" when the oldest real read of the talent is more than a day old. */
+function age(t: Talent) {
+  const reads = t.accounts.filter((a) => a.mode === 'live' && a.readAt).map((a) => a.readAt!);
+  if (!reads.length) return '';
+  const d = Math.floor((Date.now() - Math.min(...reads)) / 86400000);
+  return d >= 1 ? ' · updated ' + d + (d === 1 ? ' day' : ' days') + ' ago' : '';
+}
+
 /** Home: the overview of all AI talents. */
 export function homeView(app: AgencyApp) {
   const s = app.state;
@@ -195,7 +203,7 @@ export function homeView(app: AgencyApp) {
     return {
       hasNumbers: numbers.length > 0, numbers: numbers.join(' · '),
       name: t.name, tint: t.tint, hasPic: !!t.pic, noPic: !t.pic, picBg: picBg(t), initials: initials(t.name),
-      views: v ? v.views + " views on this week's posts" : t.accounts.length ? 'No numbers yet' : 'No account yet',
+      views: v ? v.views + " views on this week's posts" + age(t) : t.accounts.length ? 'No numbers yet' : 'No account yet',
       hasV: !!v, delta: v ? v.delta : '', color: v ? v.color : '#71717a', rot: v ? v.rot : 'none', arrow: v ? v.arrow : 'none',
       open: () => app.openTalent(t.id),
     };

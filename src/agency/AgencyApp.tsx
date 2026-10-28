@@ -543,6 +543,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }), () => {
       this.finishReturn();
       this.movePicturesToStorage();
+      this.refreshStale();
     });
   }
 
@@ -700,6 +701,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   ensure(id: string, tab: TalentTab) {
     const t = this.T(id);
     if (!t) return;
+    this.refreshStale(id);
     if (tab === 'grow' && !t.growLoaded && t.accounts.some((a) => a.mode === 'live') && this.job('grow-' + id).phase !== 'loading') {
       if (t.ideas.some((i) => i.status === 'new')) this.runJob('grow-' + id, () => this.upd(id, (x) => ({ ...x, growLoaded: true })));
       else this.moreIdeas(id);
@@ -1160,6 +1162,29 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.setState({ ov: null });
     this.toast(o.platform + ' added by handle.');
   }
+
+  /**
+   * Signed in, accounts read more than a day ago are read again in the background, so "this week" stays
+   * this week and an expired login shows up without a click. Each account is tried once per session.
+   */
+  refreshStale(tid?: string) {
+    if (!this.state.cloud || (this.props.simulate ?? 'normal') !== 'normal') return;
+    const old = Date.now() - 24 * HOUR;
+    for (const t of this.state.talents) {
+      if (tid && t.id !== tid) continue;
+      for (const a0 of t.accounts) {
+        if (a0.mode !== 'live' || a0.status !== 'ok' || !a0.ref || !a0.readAt || a0.readAt > old || this._staleTried.has(a0.id)) continue;
+        this._staleTried.add(a0.id);
+        this.liveJob('refresh-' + a0.id, () => accounts.read(a0.platform, { ref: a0.ref }), (r) => {
+          this.upd(t.id, (x) => ({ ...this.withAccounts(x, x.accounts.map((a) => (a.id === a0.id ? { ...a, ...this.readFields(r) } : a))), few: r.few }));
+        }, () => {}, (code) => {
+          // The account is gone or its access stopped: keep its last good numbers and ask for Reconnect.
+          if (code === 'not_found' || code === 'reconnect') this.upd(t.id, (x) => ({ ...x, accounts: x.accounts.map((a) => (a.id === a0.id ? { ...a, status: 'lost' as const } : a)) }));
+        });
+      }
+    }
+  }
+  private _staleTried = new Set<string>();
 
   refreshAccount(tid: string, aid: string) {
     const a0 = this.T(tid)?.accounts.find((x) => x.id === aid);
