@@ -26,11 +26,13 @@ Social accounts are read on the server (PRD features 3–4):
   channel by handle with `YOUTUBE_API_KEY` (public numbers, no watch time).
 - `POST /api/accounts/read` — body `{ platform, handle?, ref? }`, returns `{ handle, ref, stats, few }`.
   Errors: 400 `bad_request`, 404 `not_found`, 409 `reconnect`, 503 `not_configured`, 504 `timeout`, 502 `upstream`.
-- Instagram and Facebook connect through their login page. `src/server/logins.ts` lists them by URL slug;
-  `src/server/instagram.ts` (Instagram login) and `src/server/facebook.ts` (Facebook Login for Business, Pages)
-  do the platform work. `POST /api/connect/{instagram|facebook}/start` returns the login URL; the platform sends the
-  browser to `/api/connect/<platform>/callback`, which saves the tokens and sends the browser back to the app with
-  `?connected=<Platform>&tid&re&ref=<id,id>` (or `?connect_error=…`). `AgencyApp.finishReturn` finishes the connect.
+- Instagram, Facebook and TikTok connect through their login page. `src/server/logins.ts` lists them by URL slug;
+  `src/server/instagram.ts` (Instagram login), `src/server/facebook.ts` (Facebook Login for Business, Pages) and
+  `src/server/tiktok.ts` (Login Kit and Display API) do the platform work. `POST /api/connect/{instagram|facebook|tiktok}/start`
+  returns the login URL. The app opens it in a new tab; the platform sends that tab to `/api/connect/<platform>/callback`,
+  which saves the tokens and hands the result to the app tab (BroadcastChannel `aia-connect`, `AgencyApp.tabReturn`).
+  If the browser blocks the tab, the login runs in the app tab and comes back with `?connected=<Platform>&tid&re&ref=<id,id>`
+  (or `?connect_error=…`), and `AgencyApp.finishReturn` finishes the connect.
   `DELETE /api/connect/<platform>?ref=` forgets a token; `deauthorize` and `delete` are Meta's callbacks.
 - Tokens live in `account_tokens` (migrations 0003, 0004), encrypted with `TOKEN_ENCRYPTION_KEY` (`src/server/crypto.ts`).
   No RLS policies: only the server reads it. The browser keeps only the account's `ref`.

@@ -5,7 +5,7 @@ import { deleteToken } from '@/server/tokens';
 
 export const runtime = 'nodejs';
 
-/** DELETE /api/connect/{instagram|facebook}?ref=<id> — forget the signed-in student's token for that account. */
+/** DELETE /api/connect/{instagram|facebook|tiktok}?ref=<id> — forget the signed-in student's token for that account. */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
   const login = loginFor((await params).platform);
   if (!login) return NextResponse.json({ error: 'bad_request', message: 'Unknown platform.' }, { status: 404 });

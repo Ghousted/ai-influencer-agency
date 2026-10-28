@@ -2,6 +2,7 @@
 import type { Platform } from '@/agency/types';
 import { connectFacebook, facebookAuthorizeUrl, facebookConfigured } from './facebook';
 import { connectInstagram, instagramAuthorizeUrl, instagramConfigured } from './instagram';
+import { connectTiktok, tiktokAuthorizeUrl, tiktokConfigured } from './tiktok';
 
 export type Login = {
   platform: Platform;
@@ -10,7 +11,7 @@ export type Login = {
   authorizeUrl: (state: string) => string;
   /** Turn the callback's code into saved tokens. Returns the connected accounts' refs. */
   connect: (userId: string, code: string) => Promise<string[]>;
-  /** The secret that signs the platform's deauthorize and data deletion callbacks. */
+  /** The secret that signs Meta's deauthorize and data deletion callbacks. TikTok has none. */
   secret: () => string | undefined;
 };
 
@@ -22,6 +23,10 @@ const LOGINS: Record<string, Login> = {
   facebook: {
     platform: 'Facebook', configured: facebookConfigured, authorizeUrl: facebookAuthorizeUrl, connect: connectFacebook,
     secret: () => process.env.FACEBOOK_APP_SECRET,
+  },
+  tiktok: {
+    platform: 'TikTok', configured: tiktokConfigured, authorizeUrl: tiktokAuthorizeUrl, connect: connectTiktok,
+    secret: () => undefined,
   },
 };
 

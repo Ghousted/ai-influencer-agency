@@ -31,7 +31,7 @@ function tabPage(platform: string, params: Record<string, string>, back: string)
 }
 
 /**
- * GET /api/connect/{instagram|facebook}/callback — the platform sends the student here after its login page.
+ * GET /api/connect/{instagram|facebook|tiktok}/callback — the platform sends the student here after its login page.
  * Saves the tokens, then sends the browser back to the app: ?connected=<Platform>&tid&re&ref=<id,id>,
  * or ?connect_error=<reason>&platform=<Platform>&tid&re. The app finishes the connect from there.
  */

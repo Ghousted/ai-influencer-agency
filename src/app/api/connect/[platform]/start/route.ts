@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 const TTL_MS = 15 * 60000;
 
 /**
- * POST /api/connect/{instagram|facebook}/start — body { tid, reId?, tab? }. Returns { url }: the platform's login page.
+ * POST /api/connect/{instagram|facebook|tiktok}/start — body { tid, reId?, tab? }. Returns { url }: the platform's login page.
  * The browser goes there, and the platform sends it back to /api/connect/<platform>/callback.
  * `tab`: the login page runs in a new tab, so the callback hands the result to the app tab instead of reloading the app.
  */
