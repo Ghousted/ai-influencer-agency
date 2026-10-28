@@ -19,7 +19,8 @@ export function parseReadRequest(body: unknown): ReadRequest {
   if (!PLATFORMS.includes(b.platform as Platform)) throw new AccountError('bad_request', 'platform must be TikTok, Instagram, YouTube or Facebook.');
   const ref = typeof b.ref === 'string' && /^[\w-]{1,64}$/.test(b.ref) ? b.ref : undefined;
   const raw = typeof b.handle === 'string' ? b.handle : '';
-  if (!ref && !raw.trim()) throw new AccountError('bad_request', 'Give a handle or a ref.');
+  // No handle or ref check here: each platform checks its own, so a platform the server cannot read
+  // answers not_configured (and the app falls back to the simulated connect) even with an empty handle.
   return { platform: b.platform as Platform, handle: raw, ref };
 }
 
