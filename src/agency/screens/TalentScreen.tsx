@@ -136,7 +136,7 @@ export function TalentScreen({ v }: { v: any }) {
                         <span style={{ font: m.na ? "700 18px 'Plus Jakarta Sans',sans-serif" : "800 28px 'Plus Jakarta Sans',sans-serif", letterSpacing: "-0.02em", color: m.na ? "#71717a" : "#18181b" }}>
                           {m.value}
                         </span>
-                        {(m.na) ? (
+                        {(m.sub) ? (
                           <>
                           <span style={{ font: "500 12px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
                             {m.sub}

@@ -241,7 +241,8 @@ export function combineStats(accounts: Account[]): Stats | null {
 export function metricCards(t: Talent) {
   const s = t.stats;
   if (!s) return [];
-  const stale = t.accounts.filter((a) => a.mode === 'live').every((a) => a.status === 'lost');
+  // A lost account keeps its last good numbers, so a change against last week would mix old and new numbers.
+  const stale = t.accounts.some((a) => a.mode === 'live' && a.status === 'lost');
   const row = (label: string, arr: [number, number] | null, kind: 'count' | 'pts' | 'pct', unit?: string) => {
     if (!arr) return { label, value: 'Not available', na: true, notNa: false, sub: (s.timeBy || 'This platform') + ' does not share it', hasDelta: false, color: '#71717a', rot: 'none', delta: '', chip: '#F4F4F5' };
     const [a, b] = arr;
@@ -254,9 +255,38 @@ export function metricCards(t: Talent) {
       up = true; d = 'None last week';
     }
     else { const x = Math.round((a - b) / b * 100); up = x >= 0; d = Math.abs(x) + (up ? '% more' : '% less') + ' than last week'; }
-    return { label, value: (kind === 'pts' ? a + '%' : fmt(a) + (unit || '')), na: false, notNa: true, sub: '', hasDelta: !stale, delta: d, color: up ? '#006AFF' : '#B91C1C', rot: up ? 'none' : 'rotate(180deg)', chip: up ? '#EAF2FF' : '#FEECEC' };
+    // Watch time from some platforms only: say which platforms it leaves out.
+    const sub = label === 'Time spent watching' && s.timeBy ? 'Leaves out ' + s.timeBy + ', which does not share it' : '';
+    return { label, value: (kind === 'pts' ? a + '%' : fmt(a) + (unit || '')), na: false, notNa: true, sub, hasDelta: !stale, delta: d, color: up ? '#006AFF' : '#B91C1C', rot: up ? 'none' : 'rotate(180deg)', chip: up ? '#EAF2FF' : '#FEECEC' };
   };
-  return [row('Posts', s.posts, 'count'), row('Views', s.views, 'pct'), row('Average engagement', s.eng, 'pts'), row('Time spent watching', s.time, 'pct', ' h')];
+  return [row('Posts', s.posts, 'count'), row("Views on this week's posts", s.views, 'pct'), row('Average engagement', s.eng, 'pts'), row('Time spent watching', s.time, 'pct', ' h')];
+}
+
+/**
+ * The agency's numbers: every AI talent added up. An account linked to two AI talents counts once,
+ * and engagement is weighted by views (as in combineStats). Talents with simulated numbers add theirs.
+ */
+export function agencyStats(talents: Talent[]): Stats | null {
+  const seen = new Set<string>();
+  const read: Account[] = [];
+  const sims: Stats[] = [];
+  for (const t of talents) {
+    if (!t.stats) continue;
+    const real = t.accounts.filter((a) => a.mode === 'live' && a.stats);
+    if (!real.length) { sims.push(t.stats); continue; }
+    for (const a of real) {
+      const k = a.platform + ':' + (a.ref || a.id);
+      if (!seen.has(k)) { seen.add(k); read.push(a); }
+    }
+  }
+  const all = [combineStats(read), ...sims].filter((x): x is Stats => !!x);
+  if (!all.length) return null;
+  const sum = (list: Stats[], f: (s: Stats) => Pair): Pair => [0, 1].map((i) => list.reduce((n, s) => n + f(s)[i], 0)) as Pair;
+  const views = sum(all, (s) => s.views);
+  const eng = [0, 1].map((i) => (views[i] ? Math.round(all.reduce((n, s) => n + s.eng[i] * s.views[i], 0) / views[i] * 10) / 10 : 0)) as Pair;
+  const timed = all.filter((s) => s.time);
+  const untimed = Array.from(new Set(all.flatMap((s) => (s.timeBy ? s.timeBy.split(' and ') : s.time ? [] : ['One platform']))));
+  return { posts: sum(all, (s) => s.posts), views, eng, time: timed.length ? sum(timed, (s) => s.time!) : null, timeBy: untimed.length ? untimed.join(' and ') : undefined, taken: all[0].taken };
 }
 
 /** This week's views and the change against last week, for talent rows and cards. */
@@ -272,9 +302,10 @@ export function viewsOf(t: Talent) {
 export function pitchText(t: Talent, b: Pick<Brand, 'name' | 'why' | 'what'>, user: string, agency: string) {
   const f = first(t);
   const s = t.stats && t.accounts.some((a) => a.mode === 'live') ? t.stats : null;
-  const nums = s ? 'In the last 7 days, ' + f + ' had ' + fmt(s.views[0]) + ' views and ' + s.eng[0] + '% average engagement across ' + s.posts[0] + ' posts.\n\n' : '';
+  // The platforms share views per post, so these are the views of the posts from the last 7 days.
+  const nums = s ? f + "'s " + s.posts[0] + (s.posts[0] === 1 ? ' post' : ' posts') + ' from the last 7 days have ' + fmt(s.views[0]) + ' views so far, with ' + s.eng[0] + '% average engagement.\n\n' : '';
   const pitch = 'Hi ' + b.name + ' team,\n\nI run ' + t.name + ', an AI talent who posts about ' + t.niche.toLowerCase() + '. ' + b.why + '\n\n' + nums + 'I would love to talk about a sponsored post that shows ' + b.what.toLowerCase() + ' to ' + f + "'s audience.\n\nCould we set up a short call this week?\n\nThanks,\n" + user + '\n' + agency;
-  const profile = t.name + ' is an AI talent. ' + t.story + ' ' + f + ' posts about ' + t.niche.toLowerCase() + '.' + (s ? ' This week: ' + fmt(s.views[0]) + ' views, ' + s.eng[0] + '% average engagement.' : '');
+  const profile = t.name + ' is an AI talent. ' + t.story + ' ' + f + ' posts about ' + t.niche.toLowerCase() + '.' + (s ? ' Posts from the last 7 days: ' + fmt(s.views[0]) + ' views, ' + s.eng[0] + '% average engagement.' : '');
   return { pitch, profile };
 }
 

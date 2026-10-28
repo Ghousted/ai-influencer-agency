@@ -99,11 +99,11 @@ export function PitchScreen({ v }: { v: any }) {
                   <div style={{ flex: "2 1 460px", minWidth: "0", background: "#fff", borderRadius: "20px", padding: "22px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "16px" }}>
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px", font: "600 13px 'Plus Jakarta Sans',sans-serif", color: "#3f3f46" }}>
                       Pitch
-                      <textarea style={{ border: "none", background: "#FAFAFB", borderRadius: "12px", padding: "14px 16px", font: "500 15px/1.6 'Plus Jakarta Sans',sans-serif", color: "#18181b", resize: "vertical" }} value={pitch.text} onChange={pitch.onText} rows={14} />
+                      <textarea style={{ border: "none", background: "#FAFAFB", borderRadius: "12px", padding: "14px 16px", font: "500 15px/1.6 'Plus Jakarta Sans',sans-serif", color: "#18181b", resize: "vertical" }} value={pitch.text} onChange={pitch.onText} readOnly={pitch.isSent} rows={14} />
                     </label>
                     <label style={{ display: "flex", flexDirection: "column", gap: "6px", font: "600 13px 'Plus Jakarta Sans',sans-serif", color: "#3f3f46" }}>
                       Talent profile
-                      <textarea style={{ border: "none", background: "#FAFAFB", borderRadius: "12px", padding: "14px 16px", font: "500 15px/1.6 'Plus Jakarta Sans',sans-serif", color: "#18181b", resize: "vertical" }} value={pitch.profile} onChange={pitch.onProfile} rows={4} />
+                      <textarea style={{ border: "none", background: "#FAFAFB", borderRadius: "12px", padding: "14px 16px", font: "500 15px/1.6 'Plus Jakarta Sans',sans-serif", color: "#18181b", resize: "vertical" }} value={pitch.profile} onChange={pitch.onProfile} readOnly={pitch.isSent} rows={4} />
                     </label>
                     {(pitch.noNumbers) ? (
                       <>
@@ -163,7 +163,7 @@ export function PitchScreen({ v }: { v: any }) {
                             {(pitch.isSent) ? (
                               <>
                               <span>
-                                Marked as sent.
+                                Marked as sent. The text is kept as it was sent.
                               </span>
                               </>
                             ) : null}
