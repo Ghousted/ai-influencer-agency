@@ -29,6 +29,7 @@ export class Syncer {
   private saved: { talents: Map<string, Talent>; pitches: Map<string, Pitch>; posts: Map<string, ScheduledPost>; draft: string };
   private pending: Snapshot | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private stopped = false;
   private running: Promise<void> = Promise.resolve();
 
   constructor(start: CloudData & { draft?: unknown }, private onError: (message: string) => void, private onSaved?: () => void) {
@@ -37,6 +38,7 @@ export class Syncer {
 
   /** Save soon. Many quick changes become one write. */
   schedule(next: Snapshot) {
+    if (this.stopped) return;
     this.pending = next;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.flush(), 600);
@@ -50,6 +52,13 @@ export class Syncer {
     if (!next) return this.running;
     this.running = this.running.then(() => this.push(next)).catch(() => {});
     return this.running;
+  }
+
+  /** Stop saving: drop what is waiting (account deleted, or the agency loads again). */
+  stop() {
+    this.stopped = true;
+    this.pending = null;
+    clearTimeout(this.timer);
   }
 
   private async push(next: Snapshot) {

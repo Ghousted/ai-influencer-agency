@@ -353,6 +353,12 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   // ---- Navigation ------------------------------------------------------------
   go(route: Route, extra?: Partial<AppState> & { _saved?: boolean }) {
+    // Until the agency has loaded, nothing made on other screens could be saved, and the load would replace it.
+    if (this.state.cloud && !this._sync && route !== 'home' && route !== 'account') {
+      this.setState({ route: 'home', acctMenu: false });
+      this.toast(this.job('home').phase === 'loading' ? 'Your agency is still loading.' : 'Your agency did not load. Press Try again.');
+      return;
+    }
     this.setState((s) => {
       const patch: any = { route, acctMenu: false, ...(extra || {}) };
       if (s.route === 'form' && s.form && s.form.mode === 'new' && !patch._saved) {
@@ -382,6 +388,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   /** Open the signed-in student's agency after a Supabase sign-in, and load it from the database. */
   async enterCloud(p: backend.Profile) {
+    this._sync?.stop();
     this._sync = undefined;
     this.setState({
       signedIn: true, cloud: true, userId: p.userId, authBusy: false,
@@ -490,9 +497,11 @@ export class AgencyApp extends Component<AppProps, AppState> {
   async deleteAccount() {
     const email = this.state.user.email;
     if (this.state.cloud) {
-      this._sync = undefined;
+      // Saving stays on until the delete succeeds, so a failed delete loses nothing.
+      this.toast('Deleting your account…');
       const r = await backend.deleteAccount();
       if (!r.ok) { this.toast(r.error); return; }
+      this._sync?.stop();
     }
     deleteSavedAccount(email);
     this.logOut(false);
