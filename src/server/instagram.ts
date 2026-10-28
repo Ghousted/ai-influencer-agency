@@ -29,6 +29,8 @@ export function instagramAuthorizeUrl(state: string) {
     response_type: 'code',
     scope: SCOPES.join(','),
     state,
+    // Always show the login screen, so a student with several AI talents picks the right account each time.
+    force_reauth: 'true',
   });
   return `https://www.instagram.com/oauth/authorize?${q}`;
 }

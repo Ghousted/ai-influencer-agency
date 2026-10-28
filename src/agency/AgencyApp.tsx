@@ -787,24 +787,38 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const open = () => this.state.ov?.kind === 'connect';
     this.liveJob('connect', () => Promise.all(reads.map((by) => accounts.read(o.platform, by))), (rs) => {
       if (!open()) return;
-      this.upd(o.tid, (t) => {
-        let accs = t.accounts;
-        rs.forEach((r, i) => {
-          // A reconnect updates its account; connecting an account the talent already has updates it instead of adding a copy.
-          const target = (i === 0 && o.reId) || accs.find((a) => a.platform === o.platform && a.ref === r.ref)?.id;
-          accs = target
-            ? accs.map((a) => (a.id === target ? { ...a, ...this.readFields(r) } : a))
-            : accs.concat([{ id: uid('a'), platform: o.platform, ...this.readFields(r) }]);
-        });
-        // The real Grow agent writes the first ideas when the Grow tab opens.
-        return { ...this.withAccounts(t, accs), few: rs.every((r) => r.few), growLoaded: t.ideas.length ? t.growLoaded : false };
-      });
-      this.setState({ ov: null });
-      this.toast((o.reId ? 'Reconnected ' : 'Connected ') + o.platform + ' ' + rs.map((r) => r.handle).join(' and ') + '.');
+      // Facebook returns every Page the student ever shared with the app, so the student picks this talent's Page.
+      if (rs.length > 1) { this.setState((s) => ({ ov: { ...s.ov, pick: rs } })); return; }
+      this.addReads(o, rs);
     }, () => { if (open()) this.mockConnect(o); }, () => {
       // After a login page, Try again must open the login page again, not repeat this read.
       if (o.ref && open()) this.setState((s) => ({ ov: { ...s.ov, ref: null } }));
     });
+  }
+
+  /** Add (or update) the accounts from real reads on the overlay's talent, then close the overlay. */
+  private addReads(o: any, rs: AccountRead[]) {
+    this.upd(o.tid, (t) => {
+      let accs = t.accounts;
+      rs.forEach((r, i) => {
+        // A reconnect updates its account; connecting an account the talent already has updates it instead of adding a copy.
+        const target = (i === 0 && o.reId) || accs.find((a) => a.platform === o.platform && a.ref === r.ref)?.id;
+        accs = target
+          ? accs.map((a) => (a.id === target ? { ...a, ...this.readFields(r) } : a))
+          : accs.concat([{ id: uid('a'), platform: o.platform, ...this.readFields(r) }]);
+      });
+      // The real Grow agent writes the first ideas when the Grow tab opens.
+      return { ...this.withAccounts(t, accs), few: rs.every((r) => r.few), growLoaded: t.ideas.length ? t.growLoaded : false };
+    });
+    this.setState({ ov: null });
+    this.toast((o.reId ? 'Reconnected ' : 'Connected ') + o.platform + ' ' + rs.map((r) => r.handle).join(' and ') + '.');
+  }
+
+  /** The student picked which of the returned accounts (Facebook Pages) belongs to this talent. */
+  pickAccount(i: number) {
+    const o = this.state.ov;
+    const r = o?.pick?.[i];
+    if (r) this.addReads(o, [r]);
   }
 
   /**
