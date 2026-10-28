@@ -97,7 +97,7 @@ function formView(app: AgencyApp) {
     const a = accs[pl] || {};
     const phase = a.phase || 'idle';
     const handle: string = a.handle || '';
-    // Instagram and Facebook connect through their login page, so they need no handle.
+    // Instagram, Facebook and TikTok connect through their login page, so they need no handle.
     const login = app.loginPlatform(pl);
     const ready = login || !!handle.trim();
     return {

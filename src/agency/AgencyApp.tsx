@@ -73,7 +73,7 @@ export type AppState = {
 };
 
 /** Platforms that connect through their own login page instead of by handle. */
-const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook'];
+const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook', 'TikTok'];
 
 /** The tid a login page carries when it was opened from the new AI talent form (the talent has no id yet). */
 const FORM_TID = 'new-talent';

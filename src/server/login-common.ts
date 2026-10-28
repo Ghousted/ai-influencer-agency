@@ -1,4 +1,4 @@
-// Shared by the platforms that connect through a login page (Instagram, Facebook). Server only.
+// Shared by the platforms that connect through a login page (Instagram, Facebook, TikTok). Server only.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { AccountError } from './account-error';
 

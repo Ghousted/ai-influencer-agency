@@ -93,7 +93,7 @@ export const accounts = {
   read: (platform: Platform, by: { handle?: string; ref?: string }) => post<AccountRead>('/api/accounts/read', { platform, ...by }),
 
   /**
-   * Start a platform's login page (Instagram, Facebook) for a talent. The browser leaves the app; the callback
+   * Start a platform's login page (Instagram, Facebook, TikTok) for a talent. The browser leaves the app; the callback
    * brings it back with ?connected=<Platform>&tid&re&ref=<id,id> (or ?connect_error=…). Fails with
    * `wrong_origin` when the app is not open at APP_URL.
    */
