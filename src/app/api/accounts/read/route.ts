@@ -5,12 +5,13 @@ import { supabaseConfigured, userFromRequest } from '@/server/supabase';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-const STATUS: Record<AccountError['code'], number> = { bad_request: 400, not_found: 404, not_configured: 503, timeout: 504, upstream: 502 };
+const STATUS: Record<AccountError['code'], number> = { bad_request: 400, not_found: 404, not_configured: 503, reconnect: 409, timeout: 504, upstream: 502 };
 
 /** POST /api/accounts/read — body { platform, handle?, ref? }. Reads one account's numbers. */
 export async function POST(req: Request) {
   // With Supabase set up, only signed-in students can spend the platform quotas.
-  if (supabaseConfigured() && !(await userFromRequest(req))) {
+  const user = supabaseConfigured() ? await userFromRequest(req) : null;
+  if (supabaseConfigured() && !user) {
     return NextResponse.json({ error: 'unauthorized', message: 'Please log in again.' }, { status: 401 });
   }
 
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await readAccount(parseReadRequest(body));
+    const result = await readAccount(parseReadRequest(body), user?.id ?? null);
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof AccountError) {

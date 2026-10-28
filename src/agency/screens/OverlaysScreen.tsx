@@ -82,6 +82,22 @@ function OverlaysBody({ v }: { v: any }) {
                 </div>
                 </>
               ) : null}
+              {(ovl.c.picking) ? (
+                <>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ font: "600 14px 'Plus Jakarta Sans',sans-serif", color: "#3f3f46", paddingBottom: "4px" }}>
+                    {ovl.c.pickTitle}
+                  </div>
+                  {(ovl.c.picks || []).map((pk: any, pk_i: number) => (
+                    <Fragment key={pk_i}>
+                      <button style={{ height: "46px", borderRadius: "12px", border: "none", background: "#F4F4F5", color: "#18181b", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", textAlign: "left", padding: "0 16px" }} onClick={pk.go}>
+                        {pk.label}
+                      </button>
+                    </Fragment>
+                  ))}
+                </div>
+                </>
+              ) : null}
               {(ovl.c.loading) ? (
                 <>
                 <div style={{ padding: "22px 0", display: "flex", flexDirection: "column", gap: "12px", alignItems: "center", textAlign: "center" }}>

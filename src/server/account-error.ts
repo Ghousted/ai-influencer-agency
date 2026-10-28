@@ -1,7 +1,8 @@
 // Errors and result shape shared by the platform readers (src/server/accounts.ts, youtube.ts, ...).
 import type { AccountStats } from '@/agency/types';
 
-export type AccountErrorCode = 'bad_request' | 'not_found' | 'not_configured' | 'timeout' | 'upstream';
+/** `reconnect`: the platform stopped the app's access (token expired or removed). The student must connect again. */
+export type AccountErrorCode = 'bad_request' | 'not_found' | 'not_configured' | 'reconnect' | 'timeout' | 'upstream';
 
 export class AccountError extends Error {
   constructor(public code: AccountErrorCode, message: string, public status?: number) {

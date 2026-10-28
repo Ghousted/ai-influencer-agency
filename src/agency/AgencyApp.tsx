@@ -8,12 +8,12 @@ import {
   combineStats, genBrands, genContent, genPrompt, initials, moreContent, moreIdeas, parseYmd, pitchText,
   seedCalendar, starterIdeas, tstr, uid, ymd,
 } from './logic';
-import type { Account, ContentIdea, Idea, Job, Pitch, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
+import type { Account, ContentIdea, Idea, Job, Pitch, Platform, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
 import { deleteSavedAccount, loadAccount, loadState, saveAccount, saveState } from './persist';
 import * as backend from './backend';
 import { supabase } from './supabase';
 import { loadData, Syncer } from './sync';
-import { AgentCallError, accounts, agents, agentsConfigured, type AccountRead, type AgentErrorCode } from './api';
+import { AgentCallError, accounts, agents, serverStatus, type AccountRead, type AgentErrorCode } from './api';
 import { Shell } from './Shell';
 import { buildView } from './views';
 import { LandingScreen } from './screens/LandingScreen';
@@ -72,6 +72,9 @@ export type AppState = {
   authBusy?: boolean;
 };
 
+/** Platforms that connect through their own login page instead of by handle. */
+const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook'];
+
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 const ACCOUNT_KEYS = ['user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 
@@ -94,6 +97,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private _sync?: Syncer;
   /** True when the server has an OpenRouter key: signed-in students get the real agents. */
   private _agentsOn = false;
+  /** Platforms the server reads for real (from /api/health). */
+  private _live: Platform[] = [];
+  /** A platform login page just sent the student back (?connected=… or ?connect_error=…). */
+  private _return: { platform: Platform; tid: string; re: string | null; ref: string | null; error: string | null } | null = null;
   private _onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.state.ov) this.setState({ ov: null });
@@ -143,6 +150,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     };
     setTimeout(this._armReveal, 50);
 
+    this._return = this.readReturn();
     const demo = (this.props.startAt ?? 'Start page') === 'Signed in';
     if (demo) {
       this._hydrated = true;
@@ -293,7 +301,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
    * states as runJob. Signed out, under ?simulate, or when the server is not set up for it
    * (`no_key`, `not_configured`), the mock runs instead.
    */
-  async liveJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void, onError?: (code: AgentErrorCode) => void) {
+  async liveJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void, onError?: (code: AgentErrorCode, message: string) => void) {
     const sim = this.props.simulate ?? 'normal';
     if (!this.state.cloud || sim !== 'normal') { this.runJob(key, mock); return; }
     this.clearJob(key);
@@ -309,7 +317,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     } catch (e) {
       this.clearJob(key);
       const code = e instanceof AgentCallError ? e.code : 'server';
-      onError?.(code);
+      onError?.(code, e instanceof Error ? e.message : '');
       if (code === 'no_key' || code === 'not_configured') { this.runJob(key, mock); return; }
       if (code === 'needs_account') { set({ phase: 'done', long: false }); return; }
       set({ phase: code === 'timeout' ? 'stalled' : 'failed', long: false });
@@ -368,7 +376,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       route: 'home', authErr: '', auth: { name: '', email: '', password: '', agency: '' },
       jobs: { ...this.state.jobs, home: { phase: 'loading', long: false } },
     });
-    agentsConfigured().then((on) => { this._agentsOn = on; });
+    serverStatus().then((st) => { this._agentsOn = st.agents; this._live = st.live; });
     const data = await loadData();
     if (!data) {
       this.setState((s) => ({ jobs: { ...s.jobs, home: { phase: 'failed' } } }));
@@ -389,7 +397,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
       if (this._sync === sync) this.toast('Your AI talents from this browser are now saved to your account.');
     });
     this._sync = sync;
-    this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }), () => this.movePicturesToStorage());
+    this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }), () => {
+      this.finishReturn();
+      this.movePicturesToStorage();
+    });
   }
 
   /** Older talents kept their picture inline. Move each one to the storage bucket once. */
@@ -756,30 +767,113 @@ export class AgencyApp extends Component<AppProps, AppState> {
     return { handle: r.handle, ref: r.ref, mode: 'live', status: 'ok', readAt: Date.now(), updated: 0, stats: r.stats };
   }
 
-  /** Connect (or reconnect) the account in the connect overlay. YouTube is read by its handle. */
+  /**
+   * Connect (or reconnect) the account in the connect overlay. YouTube is read by its handle; Instagram and
+   * Facebook go through their login page first, which comes back with one ref or more (Facebook: one per Page).
+   */
   connectNow() {
     const o = this.state.ov;
     if (!o) return;
+    if (LOGIN_PLATFORMS.includes(o.platform) && !o.ref) { this.startLogin(o); return; }
     const t0 = this.T(o.tid);
     const re = o.reId ? t0?.accounts.find((a) => a.id === o.reId) : undefined;
-    // A handle typed in the overlay wins; a reconnect without one reads the same account again.
+    // Refs from a login page win, then a handle typed in the overlay; a reconnect without either reads the same account again.
     const typed = (o.handle || '').trim();
-    const by = typed ? { handle: typed } : re?.ref ? { ref: re.ref } : { handle: re?.handle || '' };
-    if (this.state.cloud && o.platform === 'YouTube' && !by.handle && !by.ref) return;
+    const reads: { handle?: string; ref?: string }[] = o.ref
+      ? String(o.ref).split(',').map((ref) => ({ ref }))
+      : [typed ? { handle: typed } : re?.ref ? { ref: re.ref } : { handle: re?.handle || '' }];
+    if (this.state.cloud && o.platform === 'YouTube' && !reads[0].handle && !reads[0].ref) return;
     // Closing the overlay while it connects cancels the connect.
     const open = () => this.state.ov?.kind === 'connect';
-    this.liveJob('connect', () => accounts.read(o.platform, by), (r) => {
+    this.liveJob('connect', () => Promise.all(reads.map((by) => accounts.read(o.platform, by))), (rs) => {
       if (!open()) return;
-      this.upd(o.tid, (t) => {
-        const accs = o.reId
-          ? t.accounts.map((a) => (a.id === o.reId ? { ...a, ...this.readFields(r) } : a))
-          : t.accounts.concat([{ id: uid('a'), platform: o.platform, ...this.readFields(r) }]);
-        // The real Grow agent writes the first ideas when the Grow tab opens.
-        return { ...this.withAccounts(t, accs), few: r.few, growLoaded: t.ideas.length ? t.growLoaded : false };
+      // Facebook returns every Page the student ever shared with the app, so the student picks this talent's Page.
+      if (rs.length > 1) { this.setState((s) => ({ ov: { ...s.ov, pick: rs } })); return; }
+      this.addReads(o, rs);
+    }, () => { if (open()) this.mockConnect(o); }, () => {
+      // After a login page, Try again must open the login page again, not repeat this read.
+      if (o.ref && open()) this.setState((s) => ({ ov: { ...s.ov, ref: null } }));
+    });
+  }
+
+  /** Add (or update) the accounts from real reads on the overlay's talent, then close the overlay. */
+  private addReads(o: any, rs: AccountRead[]) {
+    this.upd(o.tid, (t) => {
+      let accs = t.accounts;
+      rs.forEach((r, i) => {
+        // A reconnect updates its account; connecting an account the talent already has updates it instead of adding a copy.
+        const target = (i === 0 && o.reId) || accs.find((a) => a.platform === o.platform && a.ref === r.ref)?.id;
+        accs = target
+          ? accs.map((a) => (a.id === target ? { ...a, ...this.readFields(r) } : a))
+          : accs.concat([{ id: uid('a'), platform: o.platform, ...this.readFields(r) }]);
       });
-      this.setState({ ov: null });
-      this.toast((o.reId ? 'Reconnected ' : 'Connected ') + o.platform + ' ' + r.handle + '.');
-    }, () => { if (open()) this.mockConnect(o); });
+      // The real Grow agent writes the first ideas when the Grow tab opens.
+      return { ...this.withAccounts(t, accs), few: rs.every((r) => r.few), growLoaded: t.ideas.length ? t.growLoaded : false };
+    });
+    this.setState({ ov: null });
+    this.toast((o.reId ? 'Reconnected ' : 'Connected ') + o.platform + ' ' + rs.map((r) => r.handle).join(' and ') + '.');
+  }
+
+  /** The student picked which of the returned accounts (Facebook Pages) belongs to this talent. */
+  pickAccount(i: number) {
+    const o = this.state.ov;
+    const r = o?.pick?.[i];
+    if (r) this.addReads(o, [r]);
+  }
+
+  /**
+   * Send the browser to a platform's login page. Saves pending changes first, because the app reloads
+   * when the platform sends the student back.
+   */
+  private startLogin(o: any) {
+    const open = () => this.state.ov?.kind === 'connect';
+    this.liveJob('connect', async () => {
+      await this._sync?.flush();
+      return accounts.startLogin(o.platform, o.tid, o.reId || null);
+    }, (r) => {
+      if (open()) window.location.assign(r.url);
+    }, () => { if (open()) this.mockConnect(o); }, (code, message) => {
+      if (code === 'wrong_origin') this.toast(message);
+    });
+  }
+
+  /** Read and forget the ?connected=… or ?connect_error=… that a platform login page sent back. */
+  private readReturn(): AgencyApp['_return'] {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const connected = q.get('connected');
+      const error = q.get('connect_error');
+      const platform = (connected || q.get('platform')) as Platform | null;
+      const tid = q.get('tid');
+      if (!platform || !tid || (!connected && !error)) return null;
+      const ref = connected ? q.get('ref') : null;
+      const out = { platform, tid, re: q.get('re'), ref, error: ref ? null : error || 'failed' };
+      for (const k of ['connected', 'connect_error', 'platform', 'tid', 're', 'ref']) q.delete(k);
+      const rest = q.toString();
+      window.history.replaceState(null, '', window.location.pathname + (rest ? '?' + rest : ''));
+      return out;
+    } catch {
+      return null;
+    }
+  }
+
+  /** After the agency loads: finish the connect that a platform login page sent back, on the talent's Accounts tab. */
+  private finishReturn() {
+    const r = this._return;
+    this._return = null;
+    if (!r) return;
+    const t = this.T(r.tid);
+    if (!t) { this.toast("I couldn't find that AI talent. Connect the account again."); return; }
+    const reId = r.re && t.accounts.some((a) => a.id === r.re) ? r.re : null;
+    this.openTalent(t.id, 'accounts');
+    this.setState((s) => ({
+      ov: { kind: 'connect', tid: t.id, platform: r.platform, handle: '', reId, ref: r.ref },
+      jobs: { ...s.jobs, connect: { phase: r.error ? 'failed' : 'idle' } },
+    }), () => {
+      if (r.error === 'denied') this.toast(r.platform + ' was not connected. You can try again.');
+      if (r.error === 'no_pages') this.toast('No Facebook Page was shared. Try again and pick a Page you manage.');
+      if (!r.error) this.connectNow();
+    });
   }
 
   /** The prototype's simulated connect: made-up numbers and starter ideas. */
@@ -826,8 +920,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
       this.upd(tid, (t) => ({ ...this.withAccounts(t, t.accounts.map((a) => (a.id === aid ? { ...a, ...this.readFields(r) } : a))), few: r.few }));
       this.toast('Numbers updated.');
     }, mock, (code) => {
-      // The channel is gone: keep its last good numbers and ask for Reconnect.
-      if (code === 'not_found') this.upd(tid, (t) => ({ ...t, accounts: t.accounts.map((a) => (a.id === aid ? { ...a, status: 'lost' as const } : a)) }));
+      // The account is gone or its access stopped: keep its last good numbers and ask for Reconnect.
+      if (code === 'not_found' || code === 'reconnect') this.upd(tid, (t) => ({ ...t, accounts: t.accounts.map((a) => (a.id === aid ? { ...a, status: 'lost' as const } : a)) }));
       else if (code !== 'no_key' && code !== 'not_configured') this.toast("I couldn't read the numbers. Try again.");
     });
   }
@@ -836,15 +930,28 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const t = this.T(tid);
     const a = t?.accounts.find((x) => x.id === aid);
     this.upd(tid, (x) => this.withAccounts(x, x.accounts.filter((y) => y.id !== aid)));
+    if (this.state.cloud && a) this.forgetUnused([a], tid);
     this.setState({ ov: null });
     if (a) this.toast(a.platform + ' ' + a.handle + ' was removed.');
+  }
+
+  /** The server forgets a login platform's token once no other talent uses that account. `tid` is the talent losing them. */
+  private forgetUnused(gone: Account[], tid: string) {
+    for (const a of gone) {
+      if (!LOGIN_PLATFORMS.includes(a.platform) || !a.ref) continue;
+      const used = this.state.talents.some((x) => x.id !== tid && x.accounts.some((y) => y.platform === a.platform && y.ref === a.ref));
+      if (!used) accounts.forget(a.platform, a.ref).catch(() => {});
+    }
   }
 
   deleteTalent() {
     const id = this.state.ov.tid;
     const t = this.T(id)!;
     this.setState((s) => ({ talents: s.talents.filter((x) => x.id !== id), pitches: s.pitches.filter((p) => p.talentId !== id), posts: s.posts.filter((p) => p.talentId !== id), ov: null }));
-    if (this.state.cloud) backend.removePicture(t.pic);
+    if (this.state.cloud) {
+      backend.removePicture(t.pic);
+      this.forgetUnused(t.accounts, id);
+    }
     this.go('talents');
     this.toast(t.name + ' was deleted.');
   }
@@ -899,6 +1006,12 @@ export class AgencyApp extends Component<AppProps, AppState> {
     setAcc({ handle, phase: 'loading' });
     const mock = () => setTimeout(() => setAcc({ handle, phase: 'on' }), 1100);
     if (!this.state.cloud || (this.props.simulate ?? 'normal') !== 'normal') { mock(); return; }
+    // A login page would leave the form, so these platforms connect after the talent is saved.
+    if (LOGIN_PLATFORMS.includes(pl as Platform) && this._live.includes(pl as Platform)) {
+      setAcc({ handle, phase: 'idle' });
+      this.toast('Save the AI talent first. Then connect ' + pl + ' on its Accounts tab.');
+      return;
+    }
     // Signed in: read the account for real. The numbers are kept until the talent is saved.
     accounts.read(pl as Account['platform'], { handle }).then(
       (r) => setAcc({ handle: r.handle, phase: 'on', read: r, readAt: Date.now() }),
