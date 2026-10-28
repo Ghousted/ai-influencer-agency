@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AgencyApp } from '../AgencyApp';
 import type { Talent } from '../types';
-import { LOGO, PLATFORM_COLOR, dailyByPlatform, first, fmt, initials } from '../logic';
+import { PLATFORMS, dailyByPlatform, first, fmt, initials } from '../logic';
 
 const DAY_LONG: Record<string, string> = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 
@@ -112,40 +112,39 @@ export function homeView(app: AgencyApp) {
   const missingWho = withStats.filter((t) => !st(t).time).map((t) => first(t));
   const timeNote = '* Time spent watching leaves out ' + missingWho.join(', ') + '. ' + missingBy.join(' and ') + (missingBy.length === 1 ? ' does' : ' do') + ' not share it.';
 
-  // Views each day: one line per platform, all AI talents added up. Press a platform to hide its line.
+  // Views each day: one line per AI talent, for all platforms or the one picked in the dropdown.
   const hidden = s.homeHidden || {};
-  const daily = withStats.map(dailyByPlatform);
-  const labels = daily[0]?.labels || [];
-  const byPl: Record<string, number[]> = {};
-  daily.forEach((x) => x.lines.forEach((l) => {
-    const b = (byPl[l.platform] = byPl[l.platform] || l.now.map(() => 0));
-    l.now.forEach((v, i) => { b[i] += v; });
+  const daily = withStats.map((t) => ({ t, d: dailyByPlatform(t) }));
+  const labels = daily[0]?.d.labels || [];
+  const platOpts = PLATFORMS.filter((pl) => daily.some((x) => x.d.lines.some((l) => l.platform === pl)));
+  const plat = s.homePlat && (platOpts as readonly string[]).includes(s.homePlat) ? s.homePlat : '';
+  const series = daily.map(({ t, d }) => ({
+    t, on: !hidden[t.id],
+    days: labels.map((_, i) => d.lines.filter((l) => !plat || l.platform === plat).reduce((n, l) => n + l.now[i], 0)),
   }));
-  const series = Object.entries(byPl).map(([pl, days]) => ({ pl, days, on: !hidden[pl] }));
   const shown = series.filter((x) => x.on);
   const peak = Math.max(0, ...shown.flatMap((x) => x.days));
   const top = niceTop(peak);
   const Y = (v: number) => 200 - v / top * 196;
   const hovIdx = s.homeHover != null && s.homeHover >= 0 && s.homeHover < 7 && shown.length ? s.homeHover : null;
-  const logoBg = (pl: string) => (LOGO[pl] ? 'url(' + LOGO[pl] + ')' : 'none');
-  const lines = shown.map(({ pl, days }) => {
+  const lines = shown.map(({ t, days }) => {
     const d = smooth(days.map((v, i) => [X(i), Y(v)]));
     return {
-      color: PLATFORM_COLOR[pl], d,
+      color: colorOf(t), d,
       area: d + ' L' + X(6).toFixed(1) + ' 200 L' + X(0).toFixed(1) + ' 200 Z',
       pts: hovIdx == null ? [] : [{ x: pctX(hovIdx), y: (Y(days[hovIdx]) / 200 * 100).toFixed(2) + '%', sz: '12px', fill: '#fff' }],
     };
   });
-  const toggle = (pl: string) => app.setState((st0) => ({ homeHidden: { ...(st0.homeHidden || {}), [pl]: !(st0.homeHidden || {})[pl] } }));
-  const legend = series.map(({ pl, on }) => ({
-    name: pl, picBg: logoBg(pl), on,
-    ring: on ? PLATFORM_COLOR[pl] : '#D4D4D8',
+  const toggle = (id: string) => app.setState((st0) => ({ homeHidden: { ...(st0.homeHidden || {}), [id]: !(st0.homeHidden || {})[id] } }));
+  const legend = series.map(({ t, on }) => ({
+    name: first(t), picBg: picBg(t), on,
+    ring: on ? colorOf(t) : '#D4D4D8',
     bg: on ? '#fff' : '#F4F4F5',
     bd: on ? '#E4E4E7' : 'transparent',
     fg: on ? '#18181b' : '#A1A1AA',
     filter: on ? 'none' : 'grayscale(1) opacity(.6)',
-    tip: (on ? 'Hide ' : 'Show ') + pl,
-    toggle: () => toggle(pl),
+    tip: (on ? 'Hide ' : 'Show ') + first(t) + "'s line",
+    toggle: () => toggle(t.id),
   }));
   // Hover columns: each column covers the half way to the next day.
   const half = (592 / 6) / 2;
@@ -159,12 +158,17 @@ export function homeView(app: AgencyApp) {
       on: true,
       x: pctX(hovIdx),
       tx: hovIdx < 4 ? 'translateX(12px)' : 'translateX(calc(-100% - 12px))',
-      day: DAY_LONG[labels[hovIdx]],
-      rows: shown.map(({ pl, days }) => ({ name: pl, color: '#fff', picBg: logoBg(pl), v: fmt(days[hovIdx])!, n: days[hovIdx] })).sort((a, b) => b.n - a.n),
+      day: DAY_LONG[labels[hovIdx]] + (plat ? ' · ' + plat : ''),
+      rows: shown.map(({ t, days }) => ({ name: t.name, color: colorOf(t), picBg: picBg(t), v: fmt(days[hovIdx])!, n: days[hovIdx] })).sort((a, b) => b.n - a.n),
       total: fmt(shown.reduce((a, x) => a + x.days[hovIdx], 0)) + ' views',
     };
   const days = labels.map((label, i) => ({ label, x: pctX(i), labelColor: i === hovIdx ? '#18181b' : '#71717a' }));
-  const real = daily.some((x) => x.real);
+  const real = daily.some((x) => x.d.real);
+  const platPick = {
+    has: platOpts.length > 1, value: plat,
+    opts: [{ v: '', label: 'All platforms' }, ...platOpts.map((pl) => ({ v: pl, label: pl }))],
+    change: (e: { target: { value: string } }) => app.setState({ homePlat: e.target.value }),
+  };
 
   // Engagement by AI talent: this week bar and last week bar
   const engMax = Math.max(0, ...withStats.flatMap((t) => st(t).eng)) || 1;
@@ -213,7 +217,7 @@ export function homeView(app: AgencyApp) {
 
     legend, lines, ticks: [fmt(top), fmt(Math.round(top / 2)), '0'], days, cols, hov,
     noLines: withStats.length > 0 && !shown.length,
-    noPlatforms: withStats.length > 0 && !series.length,
+    platPick,
     chartTitle: real ? 'Views by the day posted' : 'Views each day',
     hovOff: () => { if (app.state.homeHover != null) app.setState({ homeHover: null }); },
     eng,
