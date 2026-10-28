@@ -174,6 +174,20 @@ export function TalentScreen({ v }: { v: any }) {
                         </span>
                       </div>
                     </div>
+                    {(cur.an.hasDayChips) ? (
+                      <>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                        {(cur.an.dayChips || []).map((c: any, c_i: number) => (
+                          <Fragment key={c_i}>
+                            <button style={{ height: "32px", display: "flex", alignItems: "center", gap: "8px", padding: "0 12px 0 6px", border: "none", borderRadius: "9999px", background: c.bg, boxShadow: `0 0 0 1px ${c.bd}`, font: "700 12px 'Plus Jakarta Sans',sans-serif", color: c.fg, cursor: "pointer", transition: "background .15s,opacity .15s" }} onClick={c.toggle} aria-pressed={c.on} title={c.tip} className="dc-h32">
+                              <span style={{ width: "20px", height: "20px", flexShrink: "0", backgroundImage: c.logoBg, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", filter: c.filter }} />
+                              {c.name}
+                            </button>
+                          </Fragment>
+                        ))}
+                      </div>
+                      </>
+                    ) : null}
                     <div style={{ position: "relative", height: "200px", paddingLeft: "44px", paddingBottom: "22px" }}>
                       <div style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "22px", display: "flex", flexDirection: "column", justifyContent: "space-between", pointerEvents: "none" }}>
                         {(cur.an.ticks || []).map((tk: any, tk_i: number) => (

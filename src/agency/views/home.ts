@@ -1,28 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AgencyApp } from '../AgencyApp';
 import type { Talent } from '../types';
-import { first, fmt, initials } from '../logic';
+import { LOGO, PLATFORM_COLOR, dailyByPlatform, first, fmt, initials } from '../logic';
 
-const DN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const DN_LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_LONG: Record<string, string> = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
 
 /** Chart space: same as AgencyApp.analytics() (svg viewBox 0 0 600 200). */
 const X = (d: number) => 4 + d * (592 / 6);
 const pctX = (d: number) => (X(d) / 600 * 100).toFixed(2) + '%';
-
-/**
- * This week's views split into 7 days. Same seed and same order of random
- * numbers as AgencyApp.analytics(), so the Home chart and the talent page agree.
- */
-function dailyViews(t: Talent): number[] {
-  if (!t.stats) return [];
-  let seed = 0;
-  for (const ch of t.id) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
-  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-  const ws = Array.from({ length: 7 }, () => 0.6 + rnd());
-  const sm = ws.reduce((a, b) => a + b, 0);
-  return ws.map((w) => Math.round(t.stats!.views[0] * w / sm));
-}
 
 /** Smooth path through points, same curve as AgencyApp.analytics(). */
 function smooth(pts: number[][]) {
@@ -127,36 +112,44 @@ export function homeView(app: AgencyApp) {
   const missingWho = withStats.filter((t) => !st(t).time).map((t) => first(t));
   const timeNote = '* Time spent watching leaves out ' + missingWho.join(', ') + '. ' + missingBy.join(' and ') + (missingBy.length === 1 ? ' does' : ' do') + ' not share it.';
 
-  // Views each day: one line per AI talent
+  // Views each day: one line per platform, all AI talents added up. Press a platform to hide its line.
   const hidden = s.homeHidden || {};
-  const series = withStats.map((t) => ({ t, days: dailyViews(t), on: !hidden[t.id] }));
+  const daily = withStats.map(dailyByPlatform);
+  const labels = daily[0]?.labels || [];
+  const byPl: Record<string, number[]> = {};
+  daily.forEach((x) => x.lines.forEach((l) => {
+    const b = (byPl[l.platform] = byPl[l.platform] || l.now.map(() => 0));
+    l.now.forEach((v, i) => { b[i] += v; });
+  }));
+  const series = Object.entries(byPl).map(([pl, days]) => ({ pl, days, on: !hidden[pl] }));
   const shown = series.filter((x) => x.on);
   const peak = Math.max(0, ...shown.flatMap((x) => x.days));
   const top = niceTop(peak);
   const Y = (v: number) => 200 - v / top * 196;
   const hovIdx = s.homeHover != null && s.homeHover >= 0 && s.homeHover < 7 && shown.length ? s.homeHover : null;
-  const lines = shown.map(({ t, days }) => {
+  const logoBg = (pl: string) => (LOGO[pl] ? 'url(' + LOGO[pl] + ')' : 'none');
+  const lines = shown.map(({ pl, days }) => {
     const d = smooth(days.map((v, i) => [X(i), Y(v)]));
     return {
-      color: colorOf(t), d,
+      color: PLATFORM_COLOR[pl], d,
       area: d + ' L' + X(6).toFixed(1) + ' 200 L' + X(0).toFixed(1) + ' 200 Z',
       pts: hovIdx == null ? [] : [{ x: pctX(hovIdx), y: (Y(days[hovIdx]) / 200 * 100).toFixed(2) + '%', sz: '12px', fill: '#fff' }],
     };
   });
-  const toggle = (id: string) => app.setState((st0) => ({ homeHidden: { ...(st0.homeHidden || {}), [id]: !(st0.homeHidden || {})[id] } }));
-  const legend = series.map(({ t, on }) => ({
-    name: first(t), picBg: picBg(t), on,
-    ring: on ? colorOf(t) : '#D4D4D8',
+  const toggle = (pl: string) => app.setState((st0) => ({ homeHidden: { ...(st0.homeHidden || {}), [pl]: !(st0.homeHidden || {})[pl] } }));
+  const legend = series.map(({ pl, on }) => ({
+    name: pl, picBg: logoBg(pl), on,
+    ring: on ? PLATFORM_COLOR[pl] : '#D4D4D8',
     bg: on ? '#fff' : '#F4F4F5',
     bd: on ? '#E4E4E7' : 'transparent',
     fg: on ? '#18181b' : '#A1A1AA',
     filter: on ? 'none' : 'grayscale(1) opacity(.6)',
-    tip: (on ? 'Hide ' : 'Show ') + first(t) + "'s line",
-    toggle: () => toggle(t.id),
+    tip: (on ? 'Hide ' : 'Show ') + pl,
+    toggle: () => toggle(pl),
   }));
   // Hover columns: each column covers the half way to the next day.
   const half = (592 / 6) / 2;
-  const cols = DN.map((_, i) => ({
+  const cols = labels.map((_, i) => ({
     flex: String(i === 0 || i === 6 ? 4 + half : 2 * half),
     enter: () => { if (app.state.homeHover !== i) app.setState({ homeHover: i }); },
   }));
@@ -166,11 +159,12 @@ export function homeView(app: AgencyApp) {
       on: true,
       x: pctX(hovIdx),
       tx: hovIdx < 4 ? 'translateX(12px)' : 'translateX(calc(-100% - 12px))',
-      day: DN_LONG[hovIdx],
-      rows: shown.map(({ t, days }) => ({ name: t.name, color: colorOf(t), picBg: picBg(t), v: fmt(days[hovIdx])!, n: days[hovIdx] })).sort((a, b) => b.n - a.n),
+      day: DAY_LONG[labels[hovIdx]],
+      rows: shown.map(({ pl, days }) => ({ name: pl, color: '#fff', picBg: logoBg(pl), v: fmt(days[hovIdx])!, n: days[hovIdx] })).sort((a, b) => b.n - a.n),
       total: fmt(shown.reduce((a, x) => a + x.days[hovIdx], 0)) + ' views',
     };
-  const days = DN.map((label, i) => ({ label, x: pctX(i), labelColor: i === hovIdx ? '#18181b' : '#71717a' }));
+  const days = labels.map((label, i) => ({ label, x: pctX(i), labelColor: i === hovIdx ? '#18181b' : '#71717a' }));
+  const real = daily.some((x) => x.real);
 
   // Engagement by AI talent: this week bar and last week bar
   const engMax = Math.max(0, ...withStats.flatMap((t) => st(t).eng)) || 1;
@@ -219,6 +213,8 @@ export function homeView(app: AgencyApp) {
 
     legend, lines, ticks: [fmt(top), fmt(Math.round(top / 2)), '0'], days, cols, hov,
     noLines: withStats.length > 0 && !shown.length,
+    noPlatforms: withStats.length > 0 && !series.length,
+    chartTitle: real ? 'Views by the day posted' : 'Views each day',
     hovOff: () => { if (app.state.homeHover != null) app.setState({ homeHover: null }); },
     eng,
 
