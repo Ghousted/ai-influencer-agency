@@ -85,6 +85,12 @@ export async function changePassword(email: string, current: string, next: strin
   return error ? fail(authMessage(error.message)) : { ok: true, data: null };
 }
 
+/** The user id of the session saved in this browser (another tab can sign out or sign in someone else). */
+export async function sessionUserId(): Promise<string | null> {
+  const { data } = (await supabase()?.auth.getSession()) || { data: { session: null } };
+  return data.session?.user.id || null;
+}
+
 /** The access token for calls to this app's own API routes. */
 export async function accessToken(): Promise<string | null> {
   const { data } = (await supabase()?.auth.getSession()) || { data: { session: null } };

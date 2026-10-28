@@ -149,10 +149,40 @@ export class AgencyApp extends Component<AppProps, AppState> {
   };
   private _onOnline = () => { this._sync?.flush(); };
 
+  /**
+   * Another tab may have changed the agency, signed out, or signed in someone else. When this tab comes
+   * back into view (at most every 30 s), check the session and load the agency again. Changes made in
+   * this tab are saved first; if the student changes something while it loads, this tab keeps its copy.
+   */
+  private _lastLoad = 0;
+  private _onShow = () => { if (document.visibilityState === 'visible') this.reloadFromCloud(); };
+  async reloadFromCloud() {
+    const sync = this._sync;
+    if (!this.state.cloud || !sync || Date.now() - this._lastLoad < 30000) return;
+    this._lastLoad = Date.now();
+    const uid = await backend.sessionUserId();
+    if (this._sync !== sync) return;
+    if (!uid) { this.sessionEnded(); return; }
+    if (uid !== this.state.userId) { window.location.reload(); return; }
+    if (!(await sync.flush())) return;
+    const before = this.state;
+    const d = await loadData();
+    const s = this.state;
+    if (!d || this._sync !== sync || s.talents !== before.talents || s.pitches !== before.pitches || s.posts !== before.posts) return;
+    sync.stop();
+    this._sync = new Syncer({ ...d, draft: this.withDraft(s).draft }, (m) => this.toast(m));
+    const talents = d.talents.map(realOnly);
+    const gone = (s.route === 'talent' && !talents.some((t) => t.id === s.talentId)) || (s.route === 'pitch' && !d.pitches.some((p) => p.id === s.pitchId));
+    const route: Route = gone ? (s.route === 'pitch' ? 'history' : 'talents') : s.route;
+    this.setState({ talents, pitches: d.pitches, posts: d.posts, route });
+  }
+
   componentDidMount() {
     addEventListener('visibilitychange', this._onHide);
     addEventListener('beforeunload', this._onUnload);
     addEventListener('online', this._onOnline);
+    addEventListener('visibilitychange', this._onShow);
+    addEventListener('focus', this._onShow);
     this._nr = () => {
       const n = innerWidth < 870;
       if (n !== !!this.state.narrow) this.setState({ narrow: n });
@@ -241,6 +271,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     removeEventListener('visibilitychange', this._onHide);
     removeEventListener('beforeunload', this._onUnload);
     removeEventListener('online', this._onOnline);
+    removeEventListener('visibilitychange', this._onShow);
+    removeEventListener('focus', this._onShow);
     this._bc?.close();
     this._tlOff?.();
     this._revealIO?.disconnect();
@@ -540,6 +572,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       if (this._sync === sync) this.toast('Your AI talents from this browser are now saved to your account.');
     });
     this._sync = sync;
+    this._lastLoad = Date.now();
     this.setState((s) => ({ ...start, jobs: { ...s.jobs, home: { phase: 'done' } } }), () => {
       this.finishReturn();
       this.movePicturesToStorage();
