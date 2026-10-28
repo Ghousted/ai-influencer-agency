@@ -1,7 +1,7 @@
 // YouTube Data API v3 reader. Server only: it reads YOUTUBE_API_KEY from the environment.
 // Public numbers only, found by handle, so there is no sign-in and no app review.
 // YouTube does not share watch time without the owner's sign-in, so `time` is always null.
-import { ABOUT_POSTS, AccountError, type AccountAbout, type AccountRead } from './account-error';
+import { ABOUT_POSTS, AccountError, topPosts, type AccountAbout, type AccountRead } from './account-error';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const TIMEOUT_MS = 15000;
@@ -71,11 +71,12 @@ export async function readYoutube({ handle, ref }: { handle?: string; ref?: stri
     .filter((v) => v.at > now - 14 * DAY);
 
   const stats = new Map<string, { viewCount?: string; likeCount?: string; commentCount?: string }>();
+  const titles = new Map<string, string>();
   if (recent.length) {
-    const vids = await get<{ items?: { id: string; statistics: { viewCount?: string; likeCount?: string; commentCount?: string } }[] }>('videos', {
-      part: 'statistics', id: recent.map((v) => v.id).join(','),
+    const vids = await get<{ items?: { id: string; snippet: { title: string }; statistics: { viewCount?: string; likeCount?: string; commentCount?: string } }[] }>('videos', {
+      part: 'snippet,statistics', id: recent.map((v) => v.id).join(','),
     });
-    for (const v of vids.items || []) stats.set(v.id, v.statistics);
+    for (const v of vids.items || []) { stats.set(v.id, v.statistics); titles.set(v.id, v.snippet.title); }
   }
 
   // [this week, last week] as rolling 7-day windows. YouTube's public numbers are lifetime totals
@@ -94,6 +95,10 @@ export async function readYoutube({ handle, ref }: { handle?: string; ref?: stri
     ref: c.id,
     stats: { posts: [a.posts, b.posts], views: [a.views, b.views], eng: [a.eng, b.eng], time: null },
     few: Number(c.statistics.videoCount || 0) < FEW_VIDEOS,
+    top: topPosts(recent.filter((v) => v.at > now - 7 * DAY).map((v) => {
+      const s = stats.get(v.id) || {};
+      return { text: titles.get(v.id), format: 'Video', views: Number(s.viewCount || 0), acts: Number(s.likeCount || 0) + Number(s.commentCount || 0), url: 'https://youtu.be/' + v.id };
+    })),
   };
 }
 

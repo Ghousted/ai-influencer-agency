@@ -1,7 +1,7 @@
 // Instagram API with Instagram Login. Server only: it reads INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET.
 // Works for Business and Creator accounts. In Development mode only Instagram Testers of the Meta app can connect.
 // Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
-import { ABOUT_POSTS, AccountError, type AccountAbout, type AccountRead } from './account-error';
+import { ABOUT_POSTS, AccountError, topPosts, type AccountAbout, type AccountRead } from './account-error';
 import { cryptoConfigured } from './crypto';
 import { platformFetch, redirectUri } from './login-common';
 import { supabaseConfigured } from './supabase';
@@ -90,7 +90,12 @@ async function freshToken(userId: string, ref: string): Promise<string> {
   return t.token;
 }
 
-type Media = { id: string; timestamp: string; like_count?: number; comments_count?: number };
+type Media = {
+  id: string; timestamp: string; like_count?: number; comments_count?: number;
+  caption?: string; media_type?: string; media_product_type?: string; permalink?: string;
+};
+
+const FORMAT: Record<string, string> = { CAROUSEL_ALBUM: 'Carousel', IMAGE: 'Photo', VIDEO: 'Video' };
 
 /** Posts, views and engagement for this week and last week (rolling 7-day windows). */
 export async function readInstagram(userId: string, ref: string): Promise<AccountRead> {
@@ -99,7 +104,7 @@ export async function readInstagram(userId: string, ref: string): Promise<Accoun
 
   const me = await call<{ username: string; media_count?: number }>(`${GRAPH}/me?${q({ fields: 'user_id,username,media_count' })}`);
   // Media are newest first. 50 covers two weeks for all but the busiest accounts.
-  const media = await call<{ data?: Media[] }>(`${GRAPH}/me/media?${q({ fields: 'id,timestamp,like_count,comments_count', limit: '50' })}`);
+  const media = await call<{ data?: Media[] }>(`${GRAPH}/me/media?${q({ fields: 'id,timestamp,like_count,comments_count,caption,media_type,media_product_type,permalink', limit: '50' })}`);
   const now = Date.now();
   const recent = (media.data || []).map((m) => ({ ...m, at: Date.parse(m.timestamp) })).filter((m) => m.at > now - 14 * DAY);
 
@@ -132,6 +137,13 @@ export async function readInstagram(userId: string, ref: string): Promise<Accoun
     // Instagram shares watch time only for reels, and Meta still marks that number "in development".
     stats: { posts: [a.posts, b.posts], views: [a.views, b.views], eng: [a.eng, b.eng], time: null },
     few: (me.media_count ?? 0) < FEW_POSTS,
+    top: topPosts(recent.filter((m) => m.at > now - 7 * DAY).map((m) => ({
+      text: m.caption,
+      format: m.media_product_type === 'REELS' ? 'Reel' : FORMAT[m.media_type || ''] || 'Post',
+      views: views.get(m.id) || 0,
+      acts: (m.like_count || 0) + (m.comments_count || 0),
+      url: m.permalink,
+    }))),
   };
 }
 

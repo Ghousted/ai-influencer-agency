@@ -299,6 +299,11 @@ export function TalentScreen({ v }: { v: any }) {
                           </div>
                         </Fragment>
                       ))}
+                      {(cur.an.noTop) ? (
+                        <div style={{ padding: "16px 0", borderTop: "1px solid #F4F4F5", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
+                          {cur.an.topEmpty}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div style={{ flex: "1 1 280px", background: "#fff", borderRadius: "20px", padding: "20px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "14px", minWidth: "0" }}>

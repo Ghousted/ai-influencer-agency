@@ -15,7 +15,12 @@ export type Account = {
   readAt?: number;
   /** This account's own numbers from its last real read. The talent's stats add these up. */
   stats?: AccountStats;
+  /** This account's best posts this week, from its last real read. */
+  top?: TopPost[];
 };
+
+/** A post from the last 7 days, as the platform reports it. */
+export type TopPost = { title: string; format: string; views: number; eng: number; url?: string };
 
 /** [this week, last week] */
 export type Pair = [number, number];

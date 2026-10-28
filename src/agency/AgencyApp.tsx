@@ -763,7 +763,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const t = this.T(tid)!;
     const a = reAcc ? t.accounts.find((x) => x.id === reAcc) : null;
     this.clearJob('connect');
-    this.setState((s) => ({ ov: { kind: 'connect', tid, platform: a ? a.platform : (plat || 'TikTok'), handle: '', reId: reAcc || null }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
+    this.setState((s) => ({ ov: { kind: 'connect', tid, platform: a ? a.platform : (plat || 'TikTok'), chosen: !!plat, handle: '', reId: reAcc || null }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
   }
 
   /**
@@ -776,8 +776,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   /** The account fields from a real read. */
-  private readFields(r: AccountRead): Pick<Account, 'handle' | 'ref' | 'mode' | 'status' | 'readAt' | 'updated' | 'stats'> {
-    return { handle: r.handle, ref: r.ref, mode: 'live', status: 'ok', readAt: Date.now(), updated: 0, stats: r.stats };
+  private readFields(r: AccountRead): Pick<Account, 'handle' | 'ref' | 'mode' | 'status' | 'readAt' | 'updated' | 'stats' | 'top'> {
+    return { handle: r.handle, ref: r.ref, mode: 'live', status: 'ok', readAt: Date.now(), updated: 0, stats: r.stats, top: r.top || [] };
   }
 
   /**
@@ -916,7 +916,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const reId = r.re && t.accounts.some((a) => a.id === r.re) ? r.re : null;
     this.openTalent(t.id, 'accounts');
     this.setState((s) => ({
-      ov: { kind: 'connect', tid: t.id, platform: r.platform, handle: '', reId, ref: r.ref },
+      ov: { kind: 'connect', tid: t.id, platform: r.platform, chosen: true, handle: '', reId, ref: r.ref },
       jobs: { ...s.jobs, connect: { phase: r.error ? 'failed' : 'idle' } },
     }), () => {
       if (r.error === 'denied') this.toast(r.platform + ' was not connected. You can try again.');
@@ -1229,11 +1229,26 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const live = t.accounts.filter((a) => a.mode === 'live');
     const handle = t.accounts.filter((a) => a.mode === 'handle');
     const shades = [col, col + '99', col + '55', col + '33'];
-    const pv = live.length ? split(t.stats.views[0], live.length).sort((a, b) => b - a) : [];
-    const plats = live.map((a, i) => ({ name: a.platform, sub: a.handle + (a.status === 'lost' ? ' · last good numbers' : ''), logoBg: LOGO[a.platform] ? 'url(' + LOGO[a.platform] + ')' : 'none', views: fmt(pv[i]), pct: Math.round(pv[i] / t.stats!.views[0] * 100) + '%', share: pv[i], bar: shades[i % 4] }));
-    const pool = (t.content || []).map((c) => ({ title: c.title, format: c.format, platform: c.platform })).concat(t.ideas.map((i) => ({ title: i.title.replace(/^(Post|Film|Tag|Invite|Reply to) /, ''), format: 'Short video', platform: (live[0] || {}).platform || 'TikTok' })));
-    const tv = split(Math.round(t.stats.views[0] * 0.62), 4).sort((a, b) => b - a);
-    const topPosts = pool.slice(0, 4).map((p, i) => ({ rank: i + 1, rankBg: i === 0 ? col : '#F4F4F5', rankFg: i === 0 ? '#fff' : '#52525b', title: p.title, meta: p.format + ' · ' + p.platform, logoBg: LOGO[p.platform] ? 'url(' + LOGO[p.platform] + ')' : 'none', views: fmt(tv[i]) + ' views', w: (tv[i] / tv[0] * 100).toFixed(0) + '%', eng: (t.stats!.eng[0] + (1.6 - i * 0.7) + rnd() * 0.4).toFixed(1) + '%' }));
+    // Accounts read for real have their own numbers and posts. Simulated accounts get made-up ones.
+    const real = live.length > 0 && live.every((a) => a.stats);
+    const byViews = real ? [...live].sort((a, b) => b.stats!.views[0] - a.stats!.views[0]) : live;
+    const pv = real ? byViews.map((a) => a.stats!.views[0]) : live.length ? split(t.stats.views[0], live.length).sort((a, b) => b - a) : [];
+    const pvTotal = pv.reduce((n, v) => n + v, 0);
+    const plats = byViews.map((a, i) => ({ name: a.platform, sub: a.handle + (a.status === 'lost' ? ' · last good numbers' : ''), logoBg: LOGO[a.platform] ? 'url(' + LOGO[a.platform] + ')' : 'none', views: fmt(pv[i]), pct: (pvTotal ? Math.round(pv[i] / pvTotal * 100) : 0) + '%', share: pv[i], bar: shades[i % 4] }));
+    const row = (i: number, p: { title: string; format: string; platform: string }, views: number, max: number, eng: number) => ({
+      rank: i + 1, rankBg: i === 0 ? col : '#F4F4F5', rankFg: i === 0 ? '#fff' : '#52525b', title: p.title, meta: p.format + ' · ' + p.platform,
+      logoBg: LOGO[p.platform] ? 'url(' + LOGO[p.platform] + ')' : 'none', views: fmt(views) + ' views', w: (max ? views / max * 100 : 0).toFixed(0) + '%', eng: eng.toFixed(1) + '%',
+    });
+    let topPosts;
+    if (real) {
+      const posts = live.flatMap((a) => (a.top || []).map((p) => ({ ...p, platform: a.platform as string }))).sort((a, b) => b.views - a.views).slice(0, 4);
+      topPosts = posts.map((p, i) => row(i, p, p.views, posts[0].views, p.eng));
+    } else {
+      // Simulated accounts have no posts, so the prototype shows made-up ones.
+      const pool = [{ title: 'A day in my life', format: 'Short video' }, { title: 'Answering your questions', format: 'Reel' }, { title: '3 things I tried this week', format: 'Carousel' }, { title: 'Behind the scenes', format: 'Short video' }];
+      const tv = split(Math.round(t.stats.views[0] * 0.62), 4).sort((a, b) => b - a);
+      topPosts = pool.map((p, i) => row(i, { ...p, platform: live[i % Math.max(1, live.length)]?.platform || 'TikTok' }, tv[i], tv[0], t.stats!.eng[0] + (1.6 - i * 0.7) + rnd() * 0.4));
+    }
     const SL = ['Morning', 'Noon', 'Evening', 'Night'];
     const base = [0.35, 0.5, 1, 0.7];
     const dayB = [0.75, 0.7, 0.8, 0.95, 0.9, 1, 0.85];
@@ -1257,7 +1272,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       days: DN.map((l, d) => ({ l, x: (X(d) / 600 * 100).toFixed(2) + '%', c: d === bi ? col : '#71717a' })),
       dayNote: 'Best day: ' + DN[bi] + ', with ' + fmt(now[bi]) + ' views.',
       plats, hasHandleOnly: handle.length > 0, handleNote: handle.map((a) => a.platform).join(', ') + ' is added by handle, so it shares no numbers.',
-      top: topPosts, dowL: DN.map((d) => d[0]), heat, best: DN[best.c] + ' ' + SL[best.r].toLowerCase(),
+      top: topPosts, noTop: !topPosts.length, topEmpty: real && !live.some((a) => a.top) ? 'Refresh the accounts to see this week\'s top posts.' : 'No posts this week yet.', dowL: DN.map((d) => d[0]), heat, best: DN[best.c] + ' ' + SL[best.r].toLowerCase(),
       eng, engTotal: fmt(totEng) + ' total this week',
     };
   }

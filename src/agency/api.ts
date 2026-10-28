@@ -1,6 +1,6 @@
 // Browser-side calls to the agent and account API routes (src/app/api). Sends the signed-in student's token.
 import { accessToken } from './backend';
-import type { AccountStats, Brand, ContentIdea, Platform, Talent } from './types';
+import type { AccountStats, Brand, ContentIdea, Platform, Talent, TopPost } from './types';
 
 export type AgentErrorCode =
   | 'bad_request' | 'needs_account' | 'no_key' | 'timeout' | 'upstream' | 'bad_output'
@@ -83,7 +83,7 @@ export const agents = {
     call<{ niche: string; story: string }>('profile', { name, accounts, avoid }),
 };
 
-export type AccountRead = { handle: string; ref: string; stats: AccountStats; few: boolean };
+export type AccountRead = { handle: string; ref: string; stats: AccountStats; few: boolean; top?: TopPost[] };
 
 export const accounts = {
   /**
