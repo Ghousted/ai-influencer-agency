@@ -116,7 +116,20 @@ export class AgencyApp extends Component<AppProps, AppState> {
     else if (this.state.acctMenu || this.state.colorOpen) this.setState({ acctMenu: false, colorOpen: false });
   };
 
+  /** Save what is waiting when the tab is hidden or closed; ask before closing while a save is not done. */
+  private _onHide = () => { if (document.visibilityState === 'hidden') this._sync?.flush(); };
+  private _onUnload = (e: BeforeUnloadEvent) => {
+    if (!this._sync?.dirty) return;
+    this._sync.flush();
+    e.preventDefault();
+    e.returnValue = '';
+  };
+  private _onOnline = () => { this._sync?.flush(); };
+
   componentDidMount() {
+    addEventListener('visibilitychange', this._onHide);
+    addEventListener('beforeunload', this._onUnload);
+    addEventListener('online', this._onOnline);
     this._nr = () => {
       const n = innerWidth < 870;
       if (n !== !!this.state.narrow) this.setState({ narrow: n });
@@ -198,6 +211,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
   componentWillUnmount() {
     if (this._nr) removeEventListener('resize', this._nr);
     removeEventListener('keydown', this._onKey);
+    removeEventListener('visibilitychange', this._onHide);
+    removeEventListener('beforeunload', this._onUnload);
+    removeEventListener('online', this._onOnline);
     this._bc?.close();
     this._tlOff?.();
     this._revealIO?.disconnect();
@@ -482,12 +498,21 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   logOut(keepAccount = true) {
+    if (this.state.cloud && keepAccount && this._sync) {
+      // Save anything still waiting first. If that fails, stay signed in so nothing is lost.
+      const sync = this._sync;
+      sync.flush().then((ok) => {
+        if (this._sync !== sync) return;
+        if (ok) this.logOut(false);
+        else this.toast('The app could not save your last change, so you are still logged in. Check your connection and try again.');
+      });
+      return;
+    }
     Object.keys(this.timers).forEach((k) => this.clearJob(k));
     if (this.state.cloud) {
-      // Save anything still waiting, then end the session.
-      const pending = keepAccount && this._sync ? this._sync.flush() : Promise.resolve();
+      this._sync?.stop();
       this._sync = undefined;
-      pending.finally(() => backend.signOut());
+      backend.signOut();
     } else if (keepAccount && this.state.signedIn) {
       saveAccount(this.state.user.email, this.withDraft(this.state), ACCOUNT_KEYS);
     }
@@ -873,7 +898,12 @@ export class AgencyApp extends Component<AppProps, AppState> {
    */
   private async goLogin(pl: Platform, tid: string, reId: string | null, tab: Window | null) {
     try {
-      await this._sync?.flush();
+      // This tab may leave for the login page, so everything must be saved first.
+      if (this._sync && !(await this._sync.flush())) {
+        tab?.close();
+        this.toast('The app could not save your last change. Check your connection, then try again.');
+        return;
+      }
       const r = await accounts.startLogin(pl, tid, reId, !!tab);
       if (!tab) { window.location.assign(r.url); return; }
       this._waiting = { platform: pl, tid };
