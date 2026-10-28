@@ -16,8 +16,6 @@ export const LOGO: Record<string, string> = {
   Facebook: '/assets/p-facebook.png',
   YouTube: '/assets/p-youtube.png',
 };
-/** Line color of each platform in the views charts. */
-export const PLATFORM_COLOR: Record<string, string> = { Facebook: '#1877F2', Instagram: '#E1306C', TikTok: '#18181b', YouTube: '#FF0000' };
 
 /**
  * Views of the posts from each of the last 7 days (ending today), per platform, and the 7 days before
