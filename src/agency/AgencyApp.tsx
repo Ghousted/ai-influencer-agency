@@ -75,6 +75,9 @@ export type AppState = {
 /** Platforms that connect through their own login page instead of by handle. */
 const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook'];
 
+/** The tid a login page carries when it was opened from the new AI talent form (the talent has no id yet). */
+const FORM_TID = 'new-talent';
+
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 const ACCOUNT_KEYS = ['user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 
@@ -376,7 +379,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
       route: 'home', authErr: '', auth: { name: '', email: '', password: '', agency: '' },
       jobs: { ...this.state.jobs, home: { phase: 'loading', long: false } },
     });
-    serverStatus().then((st) => { this._agentsOn = st.agents; this._live = st.live; });
+    // Re-render, because the new AI talent form shows a login or a handle box by what the server reads.
+    serverStatus().then((st) => { this._agentsOn = st.agents; this._live = st.live; this.forceUpdate(); });
     const data = await loadData();
     if (!data) {
       this.setState((s) => ({ jobs: { ...s.jobs, home: { phase: 'failed' } } }));
@@ -818,7 +822,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
   pickAccount(i: number) {
     const o = this.state.ov;
     const r = o?.pick?.[i];
-    if (r) this.addReads(o, [r]);
+    if (!r) return;
+    if (o.tid === FORM_TID) { this.setFormAcc(o.platform, { handle: r.handle, phase: 'on', read: r, readAt: Date.now() }); this.setState({ ov: null }); return; }
+    this.addReads(o, [r]);
   }
 
   /**
@@ -862,6 +868,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const r = this._return;
     this._return = null;
     if (!r) return;
+    if (r.tid === FORM_TID) { this.finishFormReturn(r); return; }
     const t = this.T(r.tid);
     if (!t) { this.toast("I couldn't find that AI talent. Connect the account again."); return; }
     const reId = r.re && t.accounts.some((a) => a.id === r.re) ? r.re : null;
@@ -873,6 +880,30 @@ export class AgencyApp extends Component<AppProps, AppState> {
       if (r.error === 'denied') this.toast(r.platform + ' was not connected. You can try again.');
       if (r.error === 'no_pages') this.toast('No Facebook Page was shared. Try again and pick a Page you manage.');
       if (!r.error) this.connectNow();
+    });
+  }
+
+  /** Back from a login page opened in the new AI talent form: resume the draft at step 2 and read the account. */
+  private finishFormReturn(r: NonNullable<AgencyApp['_return']>) {
+    if (!this.state.draft) { this.toast("I couldn't find the AI talent you were adding. Start it again."); return; }
+    this.openForm('new');
+    this.setState((s) => (s.form ? { form: { ...s.form, step: 2, resumed: false } } : null));
+    const pl = r.platform;
+    if (r.error || !r.ref) {
+      this.toast(r.error === 'denied' ? pl + ' was not connected. You can try again.'
+        : r.error === 'no_pages' ? 'No Facebook Page was shared. Try again and pick a Page you manage.'
+        : "I couldn't connect " + pl + '. Try again.');
+      return;
+    }
+    this.setFormAcc(pl, { handle: '', phase: 'loading' });
+    Promise.all(r.ref.split(',').map((ref) => accounts.read(pl, { ref }))).then((rs) => {
+      if (rs.length === 1) { this.setFormAcc(pl, { handle: rs[0].handle, phase: 'on', read: rs[0], readAt: Date.now() }); return; }
+      // Facebook returns every Page the student shared with the app, so the student picks this talent's Page.
+      this.setFormAcc(pl, null);
+      this.setState((s) => ({ ov: { kind: 'connect', tid: FORM_TID, platform: pl, handle: '', reId: null, pick: rs }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
+    }, () => {
+      this.setFormAcc(pl, null);
+      this.toast("I couldn't read that " + pl + ' account. Try again.');
     });
   }
 
@@ -996,22 +1027,51 @@ export class AgencyApp extends Component<AppProps, AppState> {
     };
   }
 
+  /** Whether this platform connects through its login page here (signed in, and the server reads it). */
+  loginPlatform(pl: string) {
+    return !!this.state.cloud && (this.props.simulate ?? 'normal') === 'normal'
+      && LOGIN_PLATFORMS.includes(pl as Platform) && this._live.includes(pl as Platform);
+  }
+
+  /** Set (or with null, clear) one account row of the new AI talent form. */
+  setFormAcc(pl: string, v: any) {
+    this.setState((s) => {
+      if (!s.form) return null;
+      const accs = { ...(s.form.accs || {}) };
+      if (v) accs[pl] = v; else delete accs[pl];
+      return { form: { ...s.form, accs } };
+    });
+  }
+
+  /**
+   * Open a platform's login page from the new AI talent form. The form is kept as the draft, so the
+   * platform's return (finishFormReturn) brings the student back to step 2 with the account connected.
+   */
+  private formLogin(pl: Platform) {
+    this.setState((s) => (s.form ? { form: { ...s.form, accs: { ...(s.form.accs || {}), [pl]: { handle: '', phase: 'loading' } } } } : null), async () => {
+      try {
+        await this._sync?.flush();
+        const r = await accounts.startLogin(pl, FORM_TID, null);
+        window.location.assign(r.url);
+      } catch (e) {
+        this.setFormAcc(pl, null);
+        const code = e instanceof AgentCallError ? e.code : 'server';
+        this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. Try again.');
+      }
+    });
+  }
+
   formConnect(pl: string) {
+    if (this.loginPlatform(pl)) { this.formLogin(pl as Platform); return; }
     const f = this.state.form;
     const acc = (f.accs || {})[pl] || {};
     const h = (acc.handle || '').trim();
     if (!h) return;
     const handle = h[0] === '@' ? h : '@' + h;
-    const setAcc = (v: any) => this.setState((s) => (s.form ? { form: { ...s.form, accs: { ...(s.form.accs || {}), [pl]: v } } } : null));
+    const setAcc = (v: any) => this.setFormAcc(pl, v);
     setAcc({ handle, phase: 'loading' });
     const mock = () => setTimeout(() => setAcc({ handle, phase: 'on' }), 1100);
     if (!this.state.cloud || (this.props.simulate ?? 'normal') !== 'normal') { mock(); return; }
-    // A login page would leave the form, so these platforms connect after the talent is saved.
-    if (LOGIN_PLATFORMS.includes(pl as Platform) && this._live.includes(pl as Platform)) {
-      setAcc({ handle, phase: 'idle' });
-      this.toast('Save the AI talent first. Then connect ' + pl + ' on its Accounts tab.');
-      return;
-    }
     // Signed in: read the account for real. The numbers are kept until the talent is saved.
     accounts.read(pl as Account['platform'], { handle }).then(
       (r) => setAcc({ handle: r.handle, phase: 'on', read: r, readAt: Date.now() }),

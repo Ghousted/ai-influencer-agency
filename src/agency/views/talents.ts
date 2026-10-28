@@ -97,7 +97,9 @@ function formView(app: AgencyApp) {
     const a = accs[pl] || {};
     const phase = a.phase || 'idle';
     const handle: string = a.handle || '';
-    const ready = !!handle.trim();
+    // Instagram and Facebook connect through their login page, so they need no handle.
+    const login = app.loginPlatform(pl);
+    const ready = login || !!handle.trim();
     return {
       name: pl,
       logoBg: logoBg(pl),
@@ -105,6 +107,9 @@ function formView(app: AgencyApp) {
       isIdle: phase === 'idle',
       isLoading: phase === 'loading',
       isOn: phase === 'on',
+      login,
+      loginText: 'Log in to ' + pl + ' to connect the account.',
+      loadingText: 'Connecting ' + (handle || pl),
       handle,
       onHandle: (e: ChangeEvent<HTMLInputElement>) => setAcc(pl, { handle: e.target.value, phase: 'idle' }),
       connect: () => { if (ready) app.formConnect(pl); },
