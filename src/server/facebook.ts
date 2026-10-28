@@ -2,7 +2,7 @@
 // FACEBOOK_APP_SECRET and FACEBOOK_CONFIG_ID (the login configuration in the Meta app).
 // In Development mode only people with a role on the Meta app can connect their Pages.
 // Docs: https://developers.facebook.com/docs/facebook-login/facebook-login-for-business
-import { ABOUT_POSTS, AccountError, type AccountAbout, type AccountRead } from './account-error';
+import { ABOUT_POSTS, AccountError, topPosts, type AccountAbout, type AccountRead } from './account-error';
 import { cryptoConfigured } from './crypto';
 import { platformFetch, redirectUri } from './login-common';
 import { supabaseConfigured } from './supabase';
@@ -54,6 +54,9 @@ export async function connectFacebook(userId: string, code: string): Promise<str
 type Post = {
   id: string;
   created_time: string;
+  message?: string;
+  status_type?: string;
+  permalink_url?: string;
   shares?: { count: number };
   reactions?: { summary?: { total_count: number } };
   comments?: { summary?: { total_count: number } };
@@ -79,7 +82,7 @@ export async function readFacebook(userId: string, ref: string): Promise<Account
   const page = await call<{ name: string; username?: string }>(`${GRAPH}/${ref}?${q({ fields: 'name,username' })}`);
   const now = Date.now();
   const posts = await call<{ data?: Post[] }>(`${GRAPH}/${ref}/posts?${q({
-    fields: 'id,created_time,shares,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)',
+    fields: 'id,created_time,message,status_type,permalink_url,shares,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)',
     since: String(Math.floor((now - 14 * DAY) / 1000)),
     limit: '100',
   })}`);
@@ -109,6 +112,18 @@ export async function readFacebook(userId: string, ref: string): Promise<Account
     ref,
     stats: { posts: [a.posts, b.posts], views: [a.views, b.views], eng: [a.eng, b.eng], time: [a.time, b.time] },
     few: recent.length < FEW_POSTS,
+    top: topPosts(recent.filter((p) => p.at > now - 7 * DAY).map((p) => ({
+      text: p.message,
+      format: p.status_type === 'added_video' ? 'Video' : p.status_type === 'added_photos' ? 'Photo' : 'Post',
+      views: byId.get(p.id)?.views || 0,
+      acts: (p.reactions?.summary?.total_count || 0) + (p.comments?.summary?.total_count || 0) + (p.shares?.count || 0),
+      url: p.permalink_url,
+    }))),
+    // Facebook shares no saves.
+    recent: recent.map((p) => ({
+      at: p.at, views: byId.get(p.id)?.views || 0, likes: p.reactions?.summary?.total_count || 0,
+      comments: p.comments?.summary?.total_count || 0, shares: p.shares?.count || 0, saves: 0,
+    })),
   };
 }
 

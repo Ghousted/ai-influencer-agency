@@ -40,7 +40,7 @@ function OverlaysBody({ v }: { v: any }) {
               {(ovl.c.idle) ? (
                 <>
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  {(ovl.c.notRe) ? (
+                  {(ovl.c.pickPlatform) ? (
                     <>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                       {(ovl.c.platforms || []).map((pl: any, pl_i: number) => (

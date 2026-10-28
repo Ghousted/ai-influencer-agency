@@ -176,10 +176,11 @@ export function overlaysView(app: AgencyApp) {
     // Signed in, YouTube is read by its handle, so the handle goes in before Connect.
     const askHandle = !!s.cloud && !re && o.platform === 'YouTube';
     ovl.c = {
-      title: re ? 'Reconnect ' + o.platform : 'Connect an account',
+      title: re ? 'Reconnect ' + o.platform : o.chosen ? 'Connect ' + o.platform : 'Connect an account',
       talent: t ? t.name : '',
       platform: o.platform,
-      notRe: !re,
+      // The student clicked Connect on one platform, so the platform buttons are left out.
+      pickPlatform: !re && !o.chosen,
       askHandle,
       fallback: !re && !askHandle,
       connectOff: askHandle && !handle.trim() ? '.5' : '1',

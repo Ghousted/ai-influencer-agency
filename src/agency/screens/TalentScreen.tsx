@@ -161,7 +161,7 @@ export function TalentScreen({ v }: { v: any }) {
                   <div style={{ flex: "2 1 460px", background: "#fff", borderRadius: "20px", padding: "20px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "14px", minWidth: "0" }}>
                     <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                       <h2 style={{ margin: "0", font: "800 16px 'Plus Jakarta Sans',sans-serif" }}>
-                        Views each day
+                        {cur.an.chartTitle}
                       </h2>
                       <div style={{ display: "flex", gap: "14px", font: "600 12px 'Plus Jakarta Sans',sans-serif", color: "#52525b" }}>
                         <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -299,6 +299,11 @@ export function TalentScreen({ v }: { v: any }) {
                           </div>
                         </Fragment>
                       ))}
+                      {(cur.an.noTop) ? (
+                        <div style={{ padding: "16px 0", borderTop: "1px solid #F4F4F5", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
+                          {cur.an.topEmpty}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div style={{ flex: "1 1 280px", background: "#fff", borderRadius: "20px", padding: "20px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "14px", minWidth: "0" }}>
@@ -307,7 +312,7 @@ export function TalentScreen({ v }: { v: any }) {
                         Best time to post
                       </h2>
                       <span style={{ font: "500 13px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
-                        When the audience watches most
+                        {cur.an.heatSub}
                       </span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "52px repeat(7,minmax(0,1fr))", gap: "4px", alignItems: "center" }}>
