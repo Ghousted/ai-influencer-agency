@@ -18,6 +18,7 @@ import { AgentCallError, accounts, agents, serverStatus, type AccountRead, type 
 import { realOnly } from './logic';
 import { Shell } from './Shell';
 import { buildView } from './views';
+import { errorText } from './errors';
 import { LandingScreen } from './screens/LandingScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -373,11 +374,26 @@ export class AgencyApp extends Component<AppProps, AppState> {
     } catch (e) {
       this.clearJob(key);
       const code = e instanceof AgentCallError ? e.code : 'server';
+      if (code === 'unauthorized') { this.sessionEnded(); return; }
       onError?.(code, e instanceof Error ? e.message : '');
       if (code === 'no_key' || code === 'not_configured') { this.runJob(key, mock); return; }
       if (code === 'needs_account') { set({ phase: 'done', long: false }); return; }
-      set({ phase: code === 'timeout' ? 'stalled' : 'failed', long: false });
+      set({ phase: code === 'timeout' ? 'stalled' : 'failed', long: false, msg: errorText(code) });
     }
+  }
+
+  /** The server no longer knows this login (expired or signed out elsewhere): ask the student to log in again. */
+  sessionEnded() {
+    if (!this.state.cloud) return;
+    this.logOut(false);
+    this.setState({ route: 'login', authErr: 'Your session ended. Log in again.' });
+  }
+
+  /** Show the message for a failed call, or send the student to Log in when the session ended. */
+  private callFailed(e: unknown, what?: string) {
+    const code = e instanceof AgentCallError ? e.code : 'server';
+    if (code === 'unauthorized') { this.sessionEnded(); return; }
+    this.toast(errorText(code, what));
   }
 
   /** New items from an agent, with fresh ids, leaving out titles the talent already has. */
@@ -1008,7 +1024,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     } catch (e) {
       tab?.close();
       const code = e instanceof AgentCallError ? e.code : 'server';
-      this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. Try again.');
+      if (code === 'unauthorized') { this.sessionEnded(); return; }
+      this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. ' + errorText(code));
     }
   }
 
@@ -1085,7 +1102,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       // Facebook returns every Page the student shared with the app, so the student picks this talent's Page.
       if (rs.length > 1) { this.setState((s) => ({ ov: { ...o, pick: rs }, jobs: { ...s.jobs, connect: { phase: 'idle' } } })); return; }
       this.addReads(o, rs);
-    }, () => this.toast("I couldn't read that " + r.platform + ' account. Try again.'));
+    }, (e) => this.callFailed(e, 'that ' + r.platform + ' account'));
   }
 
   /**
@@ -1105,9 +1122,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
       // Facebook returns every Page the student shared with the app, so the student picks this talent's Page.
       this.setFormAcc(pl, null);
       this.setState((s) => ({ ov: { kind: 'connect', tid: FORM_TID, platform: pl, handle: '', reId: null, pick: rs }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
-    }, () => {
+    }, (e) => {
       this.setFormAcc(pl, null);
-      this.toast("I couldn't read that " + pl + ' account. Try again.');
+      this.callFailed(e, 'that ' + pl + ' account');
     });
   }
 
@@ -1158,7 +1175,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }, mock, (code) => {
       // The account is gone or its access stopped: keep its last good numbers and ask for Reconnect.
       if (code === 'not_found' || code === 'reconnect') this.upd(tid, (t) => ({ ...t, accounts: t.accounts.map((a) => (a.id === aid ? { ...a, status: 'lost' as const } : a)) }));
-      else if (code !== 'no_key' && code !== 'not_configured') this.toast("I couldn't read the numbers. Try again.");
+      else if (code !== 'no_key' && code !== 'not_configured') this.toast(errorText(code, 'that ' + a0.platform + ' account'));
     });
   }
 
@@ -1300,7 +1317,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
         const code = e instanceof AgentCallError ? e.code : 'server';
         if (code === 'no_key' || code === 'not_configured') { mock(); return; }
         setAcc({ handle, phase: 'idle' });
-        this.toast(code === 'not_found' ? 'I couldn\'t find ' + pl + ' ' + handle + '. Check the handle.' : 'I couldn\'t connect that account. Try again.');
+        this.callFailed(e, pl + ' ' + handle);
       },
     );
   }
@@ -1326,7 +1343,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
       const code = e instanceof AgentCallError ? e.code : 'server';
       if (code === 'no_key') { this._agentsOn = false; mock(); return; }
       this.setState((s) => (same(s.form) ? { form: { ...s.form, filling: false } } : null));
-      this.toast(code === 'timeout' ? 'Filling it in took too long. Try again.' : "I couldn't fill it in from the accounts. Try again.");
+      if (code === 'unauthorized') { this.sessionEnded(); return; }
+      this.toast(code === 'timeout' ? 'Filling it in took too long. Try again.' : "I couldn't fill it in from the accounts. " + errorText(code));
     });
   }
 

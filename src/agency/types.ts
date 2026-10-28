@@ -138,6 +138,7 @@ export type Route =
 export type TalentTab = 'overview' | 'accounts' | 'grow' | 'content' | 'scout';
 
 export type JobPhase = 'idle' | 'loading' | 'done' | 'failed' | 'stalled';
-export type Job = { phase: JobPhase; long?: boolean };
+/** `msg`: what went wrong, for a failed job. */
+export type Job = { phase: JobPhase; long?: boolean; msg?: string };
 
 export type Simulate = 'normal' | 'slow' | 'fails' | 'stalls';
