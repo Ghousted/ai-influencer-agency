@@ -11,12 +11,14 @@ import {
 import type { Account, ContentIdea, Idea, Job, Pitch, Platform, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
 import { deleteSavedAccount, loadAccount, loadState, saveAccount, saveState } from './persist';
 import * as backend from './backend';
+import { copyText } from './clipboard';
 import { supabase } from './supabase';
 import { loadData, Syncer } from './sync';
 import { AgentCallError, accounts, agents, serverStatus, type AccountRead, type AgentErrorCode } from './api';
 import { realOnly } from './logic';
 import { Shell } from './Shell';
 import { buildView } from './views';
+import { errorText } from './errors';
 import { LandingScreen } from './screens/LandingScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -80,9 +82,12 @@ const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook', 'TikTok'];
 
 /** The tid a login page carries when it was opened from the new AI talent form (the talent has no id yet). */
 const FORM_TID = 'new-talent';
+const WAITING_KEY = 'aia-waiting-login';
 
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 const ACCOUNT_KEYS = ['user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
+/** One screen, as kept in browser history. */
+type Nav = { route: Route; talentId: string | null; tab: TalentTab; pitchId: string | null };
 
 export class AgencyApp extends Component<AppProps, AppState> {
   state: AppState = {
@@ -112,8 +117,21 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private _return: { platform: Platform; tid: string; re: string | null; ref: string | null; error: string | null } | null = null;
   /** Login tabs send their result on this channel (see tabPage in the connect callback). */
   private _bc?: BroadcastChannel;
-  /** The login this tab opened in a new tab. Other app tabs ignore its result, so the account is added once. */
-  private _waiting: { platform: Platform; tid: string } | null = null;
+  /**
+   * The login this tab opened in a new tab. Other app tabs ignore its result, so the account is added once.
+   * `sent` is the talent id the login page sends back; `tid` is where the account goes (a new talent saved
+   * while its login was still open gets the account). `n` counts logins started for the same account.
+   * Kept in sessionStorage, so a reload of this tab still takes the result.
+   */
+  private _waitingMem: { platform: Platform; tid: string; sent: string; n: number } | null = null;
+  private get _waiting() {
+    if (this._waitingMem) return this._waitingMem;
+    try { return JSON.parse(sessionStorage.getItem(WAITING_KEY) || 'null'); } catch { return null; }
+  }
+  private set _waiting(w: { platform: Platform; tid: string; sent: string; n: number } | null) {
+    this._waitingMem = w;
+    try { if (w) sessionStorage.setItem(WAITING_KEY, JSON.stringify(w)); else sessionStorage.removeItem(WAITING_KEY); } catch { /* storage blocked */ }
+  }
   private _onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.state.ov) this.setState({ ov: null });
@@ -140,6 +158,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     };
     addEventListener('resize', this._nr);
     addEventListener('keydown', this._onKey);
+    try { this._restore = (window.history.state as { aia?: Nav } | null)?.aia || null; } catch { /* not in a browser */ }
+    addEventListener('popstate', this._onPop);
     this._nr();
     this._tlSetup();
     this._revealIO = new IntersectionObserver((es) => {
@@ -204,6 +224,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   componentDidUpdate() {
     this._armReveal?.();
     if (!this._hydrated) return;
+    this.syncHistory();
     if (this.state.cloud) {
       const s = this.withDraft(this.state);
       this._sync?.schedule({ talents: s.talents, pitches: s.pitches, posts: s.posts, draft: s.draft });
@@ -213,6 +234,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   componentWillUnmount() {
+    removeEventListener('popstate', this._onPop);
     if (this._nr) removeEventListener('resize', this._nr);
     removeEventListener('keydown', this._onKey);
     removeEventListener('visibilitychange', this._onHide);
@@ -352,11 +374,26 @@ export class AgencyApp extends Component<AppProps, AppState> {
     } catch (e) {
       this.clearJob(key);
       const code = e instanceof AgentCallError ? e.code : 'server';
+      if (code === 'unauthorized') { this.sessionEnded(); return; }
       onError?.(code, e instanceof Error ? e.message : '');
       if (code === 'no_key' || code === 'not_configured') { this.runJob(key, mock); return; }
       if (code === 'needs_account') { set({ phase: 'done', long: false }); return; }
-      set({ phase: code === 'timeout' ? 'stalled' : 'failed', long: false });
+      set({ phase: code === 'timeout' ? 'stalled' : 'failed', long: false, msg: errorText(code) });
     }
+  }
+
+  /** The server no longer knows this login (expired or signed out elsewhere): ask the student to log in again. */
+  sessionEnded() {
+    if (!this.state.cloud) return;
+    this.logOut(false);
+    this.setState({ route: 'login', authErr: 'Your session ended. Log in again.' });
+  }
+
+  /** Show the message for a failed call, or send the student to Log in when the session ended. */
+  private callFailed(e: unknown, what?: string) {
+    const code = e instanceof AgentCallError ? e.code : 'server';
+    if (code === 'unauthorized') { this.sessionEnded(); return; }
+    this.toast(errorText(code, what));
   }
 
   /** New items from an agent, with fresh ids, leaving out titles the talent already has. */
@@ -370,6 +407,65 @@ export class AgencyApp extends Component<AppProps, AppState> {
       open++;
     }
     return out;
+  }
+
+  /**
+   * Browser history: each screen change is one history entry, so Back and Forward move between screens,
+   * and a reload comes back to the same screen (the browser keeps history.state across a reload).
+   */
+  private _lastNav = '';
+  private _popping = false;
+  private _restore: Nav | null = null;
+  private _onPop = (e: PopStateEvent) => {
+    const n = (e.state as { aia?: Nav } | null)?.aia;
+    if (!n) return;
+    this._popping = true;
+    this.goNav(n);
+  };
+
+  /** Open a screen from history. A talent tab loads its ideas, as when the student opens it. */
+  private goNav(n: Nav) {
+    const patch = this.navPatch(n);
+    this.setState(patch, () => { if (patch.route === 'talent' && patch.talentId) this.ensure(patch.talentId, patch.tab); });
+  }
+
+  /** The state for a saved screen. A talent or pitch that is gone opens its list; screens that need a login need one. */
+  private navPatch(n: Nav): Pick<AppState, 'route' | 'talentId' | 'tab' | 'pitchId' | 'acctMenu' | 'ov'> {
+    const s = this.state;
+    const out = ['start', 'signup', 'login'];
+    const at = (route: Route) => ({ route, talentId: s.talentId, tab: s.tab, pitchId: s.pitchId, acctMenu: false, ov: null });
+    if (!s.signedIn) return at(out.includes(n.route) ? n.route : 'start');
+    if (out.includes(n.route)) return at('home');
+    if (n.route === 'talent' && !this.T(n.talentId)) return at('talents');
+    if (n.route === 'pitch' && !s.pitches.some((p) => p.id === n.pitchId)) return at('history');
+    if (n.route === 'form' && !s.form) return at('talents');
+    return { route: n.route, talentId: n.talentId, tab: n.tab, pitchId: n.pitchId, acctMenu: false, ov: null };
+  }
+
+
+  /** Write the current screen into browser history (a new entry, or the same one after Back or a reload). */
+  private syncHistory() {
+    const s = this.state;
+    if (this._restore && this._hydrated) {
+      if (!s.signedIn) this._restore = null;
+      else if (this.job('home').phase === 'done') {
+        const r = this._restore;
+        this._restore = null;
+        this._popping = true;
+        this.goNav(r);
+        return;
+      }
+    }
+    const nav: Nav = { route: s.route, talentId: s.talentId, tab: s.tab, pitchId: s.pitchId };
+    const key = JSON.stringify(nav);
+    if (key === this._lastNav) return;
+    const replace = !this._lastNav || this._popping;
+    this._lastNav = key;
+    this._popping = false;
+    try {
+      if (replace) window.history.replaceState({ ...window.history.state, aia: nav }, '');
+      else window.history.pushState({ aia: nav }, '');
+    } catch { /* not in a browser */ }
   }
 
   // ---- Navigation ------------------------------------------------------------
@@ -707,20 +803,20 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.toast(status === 'planned' ? 'Added to your plan.' : status === 'posted' ? 'Marked as posted.' : 'Dismissed. The app will not show this idea again.');
   }
 
-  copyText(text: string) {
-    try { navigator.clipboard?.writeText(text).catch(() => {}); } catch { /* clipboard blocked */ }
+  /** Copy, then say "Copied" or tell the student to copy the text by hand. */
+  private async copyAndTell(text: string, done: string) {
+    const ok = await copyText(text);
+    this.toast(ok ? done : 'The app could not copy the text. Select the text and copy it yourself.');
   }
 
   copyPrompt(t: Talent, c: ContentIdea) {
     const p = genPrompt(t, c);
-    this.copyText(p.text);
-    this.toast(p.kind + ' copied. Paste it into your video tool.');
+    this.copyAndTell(p.text, p.kind + ' copied. Paste it into your video tool.');
   }
 
   copyBrief(c: ContentIdea) {
     const txt = c.title + '\n' + c.format + ' · ' + c.platform + ' · ' + c.length + '\nHook: ' + c.hook + '\n' + c.beats.map((b, i) => (i + 1) + '. ' + b).join('\n') + '\nPost: ' + c.when;
-    this.copyText(txt);
-    this.toast('Brief copied.');
+    this.copyAndTell(txt, 'Brief copied.');
   }
 
   setIdea(tid: string, iid: string, status: 'done' | 'dismissed') {
@@ -768,8 +864,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   copyPitch(p: Pitch) {
-    this.copyText(p.pitch + '\n\n---\nTalent profile\n' + p.profile);
-    this.toast('Copied. Paste it into your email or app. Then send it.');
+    this.copyAndTell(p.pitch + '\n\n---\nTalent profile\n' + p.profile, 'Copied. Paste it into your email or app. Then send it.');
   }
 
   // ---- Dismiss and flag ------------------------------------------------------------
@@ -920,13 +1015,17 @@ export class AgencyApp extends Component<AppProps, AppState> {
       }
       const r = await accounts.startLogin(pl, tid, reId, !!tab);
       if (!tab) { window.location.assign(r.url); return; }
-      this._waiting = { platform: pl, tid };
+      // A second Log in for the same account replaces the first one's login cookie (see tabReturn).
+      const prev = this._waiting;
+      const n = prev && prev.platform === pl && prev.sent === tid ? prev.n + 1 : 1;
+      this._waiting = { platform: pl, tid: n > 1 && prev ? prev.tid : tid, sent: tid, n };
       tab.location.href = r.url;
       this.toast('Log in to ' + pl + ' in the new tab.');
     } catch (e) {
       tab?.close();
       const code = e instanceof AgentCallError ? e.code : 'server';
-      this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. Try again.');
+      if (code === 'unauthorized') { this.sessionEnded(); return; }
+      this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. ' + errorText(code));
     }
   }
 
@@ -957,7 +1056,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const w = this._waiting;
     if (!w || !d || typeof d !== 'object') return;
     const platform = (d.connected || d.platform) as Platform;
-    if (platform !== w.platform || d.tid !== w.tid) return;
+    if (platform !== w.platform || d.tid !== w.sent) return;
+    // The student pressed Log in twice: the first login tab ends with "expired"; the second one counts.
+    if (d.connect_error === 'expired' && w.n > 1) { this._waiting = { ...w, n: w.n - 1 }; return; }
     this._waiting = null;
     const ref = d.connected && typeof d.ref === 'string' ? d.ref : null;
     this._return = { platform, tid: w.tid, re: typeof d.re === 'string' ? d.re : null, ref, error: ref ? null : d.connect_error || 'failed' };
@@ -1001,7 +1102,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       // Facebook returns every Page the student shared with the app, so the student picks this talent's Page.
       if (rs.length > 1) { this.setState((s) => ({ ov: { ...o, pick: rs }, jobs: { ...s.jobs, connect: { phase: 'idle' } } })); return; }
       this.addReads(o, rs);
-    }, () => this.toast("I couldn't read that " + r.platform + ' account. Try again.'));
+    }, (e) => this.callFailed(e, 'that ' + r.platform + ' account'));
   }
 
   /**
@@ -1021,9 +1122,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
       // Facebook returns every Page the student shared with the app, so the student picks this talent's Page.
       this.setFormAcc(pl, null);
       this.setState((s) => ({ ov: { kind: 'connect', tid: FORM_TID, platform: pl, handle: '', reId: null, pick: rs }, jobs: { ...s.jobs, connect: { phase: 'idle' } } }));
-    }, () => {
+    }, (e) => {
       this.setFormAcc(pl, null);
-      this.toast("I couldn't read that " + pl + ' account. Try again.');
+      this.callFailed(e, 'that ' + pl + ' account');
     });
   }
 
@@ -1074,7 +1175,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }, mock, (code) => {
       // The account is gone or its access stopped: keep its last good numbers and ask for Reconnect.
       if (code === 'not_found' || code === 'reconnect') this.upd(tid, (t) => ({ ...t, accounts: t.accounts.map((a) => (a.id === aid ? { ...a, status: 'lost' as const } : a)) }));
-      else if (code !== 'no_key' && code !== 'not_configured') this.toast("I couldn't read the numbers. Try again.");
+      else if (code !== 'no_key' && code !== 'not_configured') this.toast(errorText(code, 'that ' + a0.platform + ' account'));
     });
   }
 
@@ -1216,7 +1317,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
         const code = e instanceof AgentCallError ? e.code : 'server';
         if (code === 'no_key' || code === 'not_configured') { mock(); return; }
         setAcc({ handle, phase: 'idle' });
-        this.toast(code === 'not_found' ? 'I couldn\'t find ' + pl + ' ' + handle + '. Check the handle.' : 'I couldn\'t connect that account. Try again.');
+        this.callFailed(e, pl + ' ' + handle);
       },
     );
   }
@@ -1242,7 +1343,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
       const code = e instanceof AgentCallError ? e.code : 'server';
       if (code === 'no_key') { this._agentsOn = false; mock(); return; }
       this.setState((s) => (same(s.form) ? { form: { ...s.form, filling: false } } : null));
-      this.toast(code === 'timeout' ? 'Filling it in took too long. Try again.' : "I couldn't fill it in from the accounts. Try again.");
+      if (code === 'unauthorized') { this.sessionEnded(); return; }
+      this.toast(code === 'timeout' ? 'Filling it in took too long. Try again.' : "I couldn't fill it in from the accounts. " + errorText(code));
     });
   }
 
@@ -1277,6 +1379,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
     t.brands = this.state.cloud && this._agentsOn ? [] : genBrands(t).map((b) => ({ ...b, flagged: false }));
     if (fAccs.length && !(real && this._agentsOn)) t.ideas = starterIdeas(t).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
     this.setState((s) => ({ talents: s.talents.concat([t]), draft: null }));
+    // A login tab still open for this form: its account goes to the saved talent.
+    const w = this._waiting;
+    if (w && w.sent === FORM_TID) this._waiting = { ...w, tid: t.id };
     this.go('talent', { talentId: t.id, tab: 'overview', _saved: true, draft: null });
     this.toast(t.name + ' was added.' + (fAccs.length ? '' : ' Next, connect an account.'));
   }

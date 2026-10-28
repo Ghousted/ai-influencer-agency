@@ -192,6 +192,7 @@ export function overlaysView(app: AgencyApp) {
       loading: j.loading,
       long: j.long,
       bad: j.bad,
+      err: app.job('connect').msg || "I couldn't connect that account.",
       platforms: PLATFORMS.map((pl) => {
         const on = pl === o.platform;
         return { label: pl, bg: on ? '#EAF2FF' : '#F4F4F5', color: on ? '#006AFF' : '#3f3f46', go: () => setOv({ platform: pl }) };

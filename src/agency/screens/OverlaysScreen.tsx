@@ -122,7 +122,7 @@ function OverlaysBody({ v }: { v: any }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderRadius: "12px", background: "#FEECEC", font: "600 14px 'Plus Jakarta Sans',sans-serif", color: "#18181b" }}>
                     <span style={{ width: "8px", height: "8px", borderRadius: "9999px", background: "#B91C1C" }} />
-                    I couldn&apos;t connect that account
+                    {ovl.c.err}
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <input style={{ flex: "1", minWidth: "0", height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" />
