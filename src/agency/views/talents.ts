@@ -68,7 +68,7 @@ function talentCards(app: AgencyApp) {
       views: v ? v.views + ' views' : '',
       delta: v ? v.delta : '',
       color: v ? v.color : '#71717a',
-      rot: v ? v.rot : 'none',
+      rot: v ? v.rot : 'none', arrow: v ? v.arrow : 'none',
       open: () => app.openTalent(t.id),
     };
   });
