@@ -14,6 +14,7 @@ import * as backend from './backend';
 import { supabase } from './supabase';
 import { loadData, Syncer } from './sync';
 import { AgentCallError, accounts, agents, serverStatus, type AccountRead, type AgentErrorCode } from './api';
+import { realOnly } from './logic';
 import { Shell } from './Shell';
 import { buildView } from './views';
 import { LandingScreen } from './screens/LandingScreen';
@@ -104,6 +105,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private _agentsOn = false;
   /** Platforms the server reads for real (from /api/health). */
   private _live: Platform[] = [];
+  /** The server's answer on agents and platforms. Until it comes, signed-in actions wait for it. */
+  private _status: Promise<void> = Promise.resolve();
+  private _statusKnown = true;
   /** A platform login page just sent the student back (?connected=… or ?connect_error=…). */
   private _return: { platform: Platform; tid: string; re: string | null; ref: string | null; error: string | null } | null = null;
   /** Login tabs send their result on this channel (see tabPage in the connect callback). */
@@ -305,9 +309,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
    * Run an agent. Signed-in students with an OpenRouter key get the real agent through /api/agents;
    * everyone else (local demo, ?simulate) gets the mock agent through runJob.
    */
-  agentJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void) {
+  agentJob<T>(key: string, call: () => Promise<T>, apply: (result: T) => void, mock: () => void): void {
+    if (this.state.cloud && !this._statusKnown) { this._status.then(() => this.agentJob(key, call, apply, mock)); return; }
     if (!this._agentsOn) { this.runJob(key, mock); return; }
-    return this.liveJob(key, call, apply, mock, (code) => { if (code === 'no_key') this._agentsOn = false; });
+    this.liveJob(key, call, apply, mock, (code) => { if (code === 'no_key') this._agentsOn = false; });
   }
 
   /**
@@ -391,7 +396,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
       jobs: { ...this.state.jobs, home: { phase: 'loading', long: false } },
     });
     // Re-render, because the new AI talent form shows a login or a handle box by what the server reads.
-    serverStatus().then((st) => { this._agentsOn = st.agents; this._live = st.live; this.forceUpdate(); });
+    this._statusKnown = false;
+    this._status = serverStatus().then((st) => { this._agentsOn = st.agents; this._live = st.live; this._statusKnown = true; this.forceUpdate(); });
     const data = await loadData();
     if (!data) {
       this.setState((s) => ({ jobs: { ...s.jobs, home: { phase: 'failed' } } }));
@@ -400,9 +406,11 @@ export class AgencyApp extends Component<AppProps, AppState> {
     // One-time import: an agency made in this browser before sign-in moves into the database.
     const local = loadAccount(p.email) as Partial<AppState> | null;
     const importLocal = !data.talents.length && !!local?.talents?.length;
-    const start = importLocal
+    const loaded = importLocal
       ? { talents: local!.talents as Talent[], pitches: (local!.pitches as Pitch[]) || [], posts: (local!.posts as ScheduledPost[]) || [] }
       : data;
+    // Older versions gave some accounts made-up numbers. Signed in, only real numbers stay.
+    const start = { ...loaded, talents: loaded.talents.map(realOnly) };
     // Keep the browser copy until the first save reaches the database, so a failed save or a closed tab loses nothing.
     let imported = !importLocal;
     const sync = new Syncer(importLocal ? { talents: [], pitches: [], posts: [], draft: null } : { ...data, draft: p.draft }, (m) => this.toast(m), () => {
@@ -774,7 +782,12 @@ export class AgencyApp extends Component<AppProps, AppState> {
    */
   withAccounts(t: Talent, accounts: Account[]): Talent {
     const live = accounts.some((a) => a.mode === 'live');
-    return { ...t, accounts, stats: combineStats(accounts) || (live ? t.stats : null) };
+    return { ...t, accounts, stats: combineStats(accounts) || (live && this.simulated ? t.stats : null) };
+  }
+
+  /** Local demo or ?simulate: accounts and agents may be simulated. Signed in, every number is real. */
+  get simulated() {
+    return !this.state.cloud || (this.props.simulate ?? 'normal') !== 'normal';
   }
 
   /** The account fields from a real read. */
@@ -843,6 +856,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
    * when the platform sends the student back.
    */
   private startLogin(o: any) {
+    if (this.state.cloud && !this._statusKnown) { this._status.then(() => this.startLogin(o)); return; }
     // Signed out, under ?simulate, or a platform the server does not read: the simulated connect.
     if (!this.loginPlatform(o.platform)) { this.runJob('connect', () => this.mockConnect(o)); return; }
     this.setState({ ov: null });
@@ -974,8 +988,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
     });
   }
 
-  /** The prototype's simulated connect: made-up numbers and starter ideas. */
+  /** The prototype's simulated connect: made-up numbers and starter ideas. Signed in, the account is added by handle instead. */
   private mockConnect(o2: any) {
+    if (!this.simulated) { this.handleConnect(o2); return; }
     this.upd(o2.tid, (t) => {
       let accounts;
       if (o2.reId) accounts = t.accounts.map((a) => (a.id === o2.reId ? { ...a, status: 'ok' as const, updated: 0 } : a));
@@ -1094,6 +1109,21 @@ export class AgencyApp extends Component<AppProps, AppState> {
     };
   }
 
+  /** Signed in, a platform the server cannot read: keep the account by its handle, with no numbers. */
+  private handleConnect(o: any) {
+    const t = this.T(o.tid);
+    const re = o.reId ? t?.accounts.find((a) => a.id === o.reId) : undefined;
+    const typed = (o.handle || '').trim();
+    const raw = typed || re?.handle || '';
+    if (!raw) { this.toast('Type the ' + o.platform + ' handle first.'); return; }
+    const handle = raw[0] === '@' ? raw : '@' + raw;
+    this.upd(o.tid, (x) => this.withAccounts(x, re
+      ? x.accounts.map((a) => (a.id === re.id ? { ...a, handle, mode: 'handle' as const, status: 'ok' as const } : a))
+      : x.accounts.concat([{ id: uid('a'), platform: o.platform, handle, mode: 'handle', status: 'ok' }])));
+    this.setState({ ov: null });
+    this.toast('The app cannot read ' + o.platform + ' yet, so ' + handle + ' is added by handle, with no numbers.');
+  }
+
   /** Whether this platform connects through its login page here (signed in, and the server reads it). */
   loginPlatform(pl: string) {
     return !!this.state.cloud && (this.props.simulate ?? 'normal') === 'normal'
@@ -1125,6 +1155,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   formConnect(pl: string) {
+    if (this.state.cloud && !this._statusKnown) { this._status.then(() => this.formConnect(pl)); return; }
     if (this.loginPlatform(pl)) { this.formLogin(pl as Platform); return; }
     const f = this.state.form;
     const acc = (f.accs || {})[pl] || {};
@@ -1133,8 +1164,12 @@ export class AgencyApp extends Component<AppProps, AppState> {
     const handle = h[0] === '@' ? h : '@' + h;
     const setAcc = (v: any) => this.setFormAcc(pl, v);
     setAcc({ handle, phase: 'loading' });
-    const mock = () => setTimeout(() => setAcc({ handle, phase: 'on' }), 1100);
-    if (!this.state.cloud || (this.props.simulate ?? 'normal') !== 'normal') { mock(); return; }
+    const mock = () => {
+      if (this.simulated) { setTimeout(() => setAcc({ handle, phase: 'on' }), 1100); return; }
+      setAcc({ handle, phase: 'on', byHandle: true });
+      this.toast('The app cannot read ' + pl + ' yet, so ' + handle + ' is added by handle, with no numbers.');
+    };
+    if (this.simulated) { mock(); return; }
     // Signed in: read the account for real. The numbers are kept until the talent is saved.
     accounts.read(pl as Account['platform'], { handle }).then(
       (r) => setAcc({ handle: r.handle, phase: 'on', read: r, readAt: Date.now() }),
@@ -1195,10 +1230,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
       return;
     }
     const onAccs = Object.entries<any>(f.accs || {}).filter(([, a]) => a.phase === 'on');
-    const fAccs: Account[] = onAccs.map(([platform, a]) => ({ id: uid('a'), platform: platform as any, ...(a.read ? { ...this.readFields(a.read), readAt: a.readAt } : { handle: a.handle, mode: 'live' as const, status: 'ok' as const, updated: 0 }) }));
+    const fAccs: Account[] = onAccs.map(([platform, a]) => ({ id: uid('a'), platform: platform as any, ...(a.read ? { ...this.readFields(a.read), readAt: a.readAt } : { handle: a.handle, mode: a.byHandle ? 'handle' as const : 'live' as const, status: 'ok' as const, updated: 0 }) }));
     const real = combineStats(fAccs);
     const few = onAccs.some(([, a]) => a.read) ? onAccs.some(([, a]) => a.read?.few) : true;
-    const t: Talent = { id: uid('t'), name: f.name.trim(), niche: f.niche.trim(), story: f.story.trim(), pic: f.pic, color: f.color || this.nextColor(), tint: TINTS[this.state.talents.length % TINTS.length], accounts: fAccs, stats: real || (fAccs.length ? { posts: [6, 4], views: [5200, 4100], eng: [6.1, 5.5], time: [40, 31], taken: MONTHS[new Date().getMonth()] + ' ' + new Date().getDate() } : null), ideas: [], brands: [], few, growLoaded: false, scoutLoaded: false };
+    const t: Talent = { id: uid('t'), name: f.name.trim(), niche: f.niche.trim(), story: f.story.trim(), pic: f.pic, color: f.color || this.nextColor(), tint: TINTS[this.state.talents.length % TINTS.length], accounts: fAccs, stats: real || (fAccs.length && this.simulated ? { posts: [6, 4], views: [5200, 4100], eng: [6.1, 5.5], time: [40, 31], taken: MONTHS[new Date().getMonth()] + ' ' + new Date().getDate() } : null), ideas: [], brands: [], few, growLoaded: false, scoutLoaded: false };
     // Signed in with real agents: Scout writes the brand ideas when the Scout tab opens.
     t.brands = this.state.cloud && this._agentsOn ? [] : genBrands(t).map((b) => ({ ...b, flagged: false }));
     if (fAccs.length && !(real && this._agentsOn)) t.ideas = starterIdeas(t).map((x, i) => ({ id: uid('i'), status: 'new' as const, flagged: false, date: Date.now() - i * 60000, ...x }));
@@ -1222,7 +1257,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
       return ws.map((w) => Math.round(tot * w / sm));
     };
     const LOGO: Record<string, string> = { TikTok: '/assets/p-tiktok.png', Instagram: '/assets/p-instagram.png', Facebook: '/assets/p-facebook.png', YouTube: '/assets/p-youtube.png' };
-    const live = t.accounts.filter((a) => a.mode === 'live');
+    // A talent with real and simulated accounts uses the real ones only.
+    const anyRead = t.accounts.some((a) => a.mode === 'live' && a.stats);
+    const live = t.accounts.filter((a) => a.mode === 'live' && (!anyRead || a.stats));
     const handle = t.accounts.filter((a) => a.mode === 'handle');
     const shades = [col, col + '99', col + '55', col + '33'];
     // Accounts read for real have their own numbers and posts. Simulated accounts get made-up ones.
