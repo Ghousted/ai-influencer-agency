@@ -85,6 +85,8 @@ const WAITING_KEY = 'aia-waiting-login';
 
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 const ACCOUNT_KEYS = ['user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
+/** One screen, as kept in browser history. */
+type Nav = { route: Route; talentId: string | null; tab: TalentTab; pitchId: string | null };
 
 export class AgencyApp extends Component<AppProps, AppState> {
   state: AppState = {
@@ -155,6 +157,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     };
     addEventListener('resize', this._nr);
     addEventListener('keydown', this._onKey);
+    try { this._restore = (window.history.state as { aia?: Nav } | null)?.aia || null; } catch { /* not in a browser */ }
+    addEventListener('popstate', this._onPop);
     this._nr();
     this._tlSetup();
     this._revealIO = new IntersectionObserver((es) => {
@@ -219,6 +223,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   componentDidUpdate() {
     this._armReveal?.();
     if (!this._hydrated) return;
+    this.syncHistory();
     if (this.state.cloud) {
       const s = this.withDraft(this.state);
       this._sync?.schedule({ talents: s.talents, pitches: s.pitches, posts: s.posts, draft: s.draft });
@@ -228,6 +233,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   componentWillUnmount() {
+    removeEventListener('popstate', this._onPop);
     if (this._nr) removeEventListener('resize', this._nr);
     removeEventListener('keydown', this._onKey);
     removeEventListener('visibilitychange', this._onHide);
@@ -385,6 +391,65 @@ export class AgencyApp extends Component<AppProps, AppState> {
       open++;
     }
     return out;
+  }
+
+  /**
+   * Browser history: each screen change is one history entry, so Back and Forward move between screens,
+   * and a reload comes back to the same screen (the browser keeps history.state across a reload).
+   */
+  private _lastNav = '';
+  private _popping = false;
+  private _restore: Nav | null = null;
+  private _onPop = (e: PopStateEvent) => {
+    const n = (e.state as { aia?: Nav } | null)?.aia;
+    if (!n) return;
+    this._popping = true;
+    this.goNav(n);
+  };
+
+  /** Open a screen from history. A talent tab loads its ideas, as when the student opens it. */
+  private goNav(n: Nav) {
+    const patch = this.navPatch(n);
+    this.setState(patch, () => { if (patch.route === 'talent' && patch.talentId) this.ensure(patch.talentId, patch.tab); });
+  }
+
+  /** The state for a saved screen. A talent or pitch that is gone opens its list; screens that need a login need one. */
+  private navPatch(n: Nav): Pick<AppState, 'route' | 'talentId' | 'tab' | 'pitchId' | 'acctMenu' | 'ov'> {
+    const s = this.state;
+    const out = ['start', 'signup', 'login'];
+    const at = (route: Route) => ({ route, talentId: s.talentId, tab: s.tab, pitchId: s.pitchId, acctMenu: false, ov: null });
+    if (!s.signedIn) return at(out.includes(n.route) ? n.route : 'start');
+    if (out.includes(n.route)) return at('home');
+    if (n.route === 'talent' && !this.T(n.talentId)) return at('talents');
+    if (n.route === 'pitch' && !s.pitches.some((p) => p.id === n.pitchId)) return at('history');
+    if (n.route === 'form' && !s.form) return at('talents');
+    return { route: n.route, talentId: n.talentId, tab: n.tab, pitchId: n.pitchId, acctMenu: false, ov: null };
+  }
+
+
+  /** Write the current screen into browser history (a new entry, or the same one after Back or a reload). */
+  private syncHistory() {
+    const s = this.state;
+    if (this._restore && this._hydrated) {
+      if (!s.signedIn) this._restore = null;
+      else if (this.job('home').phase === 'done') {
+        const r = this._restore;
+        this._restore = null;
+        this._popping = true;
+        this.goNav(r);
+        return;
+      }
+    }
+    const nav: Nav = { route: s.route, talentId: s.talentId, tab: s.tab, pitchId: s.pitchId };
+    const key = JSON.stringify(nav);
+    if (key === this._lastNav) return;
+    const replace = !this._lastNav || this._popping;
+    this._lastNav = key;
+    this._popping = false;
+    try {
+      if (replace) window.history.replaceState({ ...window.history.state, aia: nav }, '');
+      else window.history.pushState({ aia: nav }, '');
+    } catch { /* not in a browser */ }
   }
 
   // ---- Navigation ------------------------------------------------------------
