@@ -11,6 +11,7 @@ import {
 import type { Account, ContentIdea, Idea, Job, Pitch, Platform, Route, ScheduledPost, Simulate, Talent, TalentTab } from './types';
 import { deleteSavedAccount, loadAccount, loadState, saveAccount, saveState } from './persist';
 import * as backend from './backend';
+import { copyText } from './clipboard';
 import { supabase } from './supabase';
 import { loadData, Syncer } from './sync';
 import { AgentCallError, accounts, agents, serverStatus, type AccountRead, type AgentErrorCode } from './api';
@@ -707,20 +708,20 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this.toast(status === 'planned' ? 'Added to your plan.' : status === 'posted' ? 'Marked as posted.' : 'Dismissed. The app will not show this idea again.');
   }
 
-  copyText(text: string) {
-    try { navigator.clipboard?.writeText(text).catch(() => {}); } catch { /* clipboard blocked */ }
+  /** Copy, then say "Copied" or tell the student to copy the text by hand. */
+  private async copyAndTell(text: string, done: string) {
+    const ok = await copyText(text);
+    this.toast(ok ? done : 'The app could not copy the text. Select the text and copy it yourself.');
   }
 
   copyPrompt(t: Talent, c: ContentIdea) {
     const p = genPrompt(t, c);
-    this.copyText(p.text);
-    this.toast(p.kind + ' copied. Paste it into your video tool.');
+    this.copyAndTell(p.text, p.kind + ' copied. Paste it into your video tool.');
   }
 
   copyBrief(c: ContentIdea) {
     const txt = c.title + '\n' + c.format + ' · ' + c.platform + ' · ' + c.length + '\nHook: ' + c.hook + '\n' + c.beats.map((b, i) => (i + 1) + '. ' + b).join('\n') + '\nPost: ' + c.when;
-    this.copyText(txt);
-    this.toast('Brief copied.');
+    this.copyAndTell(txt, 'Brief copied.');
   }
 
   setIdea(tid: string, iid: string, status: 'done' | 'dismissed') {
@@ -768,8 +769,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   }
 
   copyPitch(p: Pitch) {
-    this.copyText(p.pitch + '\n\n---\nTalent profile\n' + p.profile);
-    this.toast('Copied. Paste it into your email or app. Then send it.');
+    this.copyAndTell(p.pitch + '\n\n---\nTalent profile\n' + p.profile, 'Copied. Paste it into your email or app. Then send it.');
   }
 
   // ---- Dismiss and flag ------------------------------------------------------------
