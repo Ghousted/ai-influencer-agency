@@ -65,3 +65,10 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px s
   .aia-tl-step{width:260px !important}
   .aia-tl-step h3{font-size:24px !important}
 }
+
+/* Terms and privacy pages */
+.legal h2 { font-size: 19px; font-weight: 700; margin: 32px 0 8px; }
+.legal p, .legal ul { margin: 0 0 12px; }
+.legal ul { padding-left: 20px; }
+.legal li { margin-bottom: 6px; }
+.legal a { color: #006AFF; }
