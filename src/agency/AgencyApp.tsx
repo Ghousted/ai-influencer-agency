@@ -841,21 +841,45 @@ export class AgencyApp extends Component<AppProps, AppState> {
    * when the platform sends the student back.
    */
   private startLogin(o: any) {
-    const open = () => this.state.ov?.kind === 'connect';
-    const tab = this.state.cloud && (this.props.simulate ?? 'normal') === 'normal' ? this.loginTab() : null;
-    this.liveJob('connect', async () => {
+    // Signed out, under ?simulate, or a platform the server does not read: the simulated connect.
+    if (!this.loginPlatform(o.platform)) { this.runJob('connect', () => this.mockConnect(o)); return; }
+    this.setState({ ov: null });
+    this.goLogin(o.platform, o.tid, o.reId || null, this.loginTab());
+  }
+
+  /**
+   * Connect (or Reconnect) one platform on the Accounts tab. Instagram and Facebook open their login tab
+   * at once, with no dialog. YouTube needs a handle, so it and the simulated platforms use the connect dialog.
+   */
+  connectAccount(tid: string, platform: Platform, reAcc: string | null = null) {
+    if (!this.loginPlatform(platform)) { this.openConnect(tid, reAcc, platform); return; }
+    this.goLogin(platform, tid, reAcc, this.loginTab());
+  }
+
+  /**
+   * Send a platform's login page to `tab` (opened during the click), or to this tab when the browser
+   * blocked the new one. Saves pending changes first, because a login in this tab reloads the app.
+   */
+  private async goLogin(pl: Platform, tid: string, reId: string | null, tab: Window | null) {
+    try {
       await this._sync?.flush();
-      return accounts.startLogin(o.platform, o.tid, o.reId || null, !!tab);
-    }, (r) => {
-      if (!tab) { if (open()) window.location.assign(r.url); return; }
-      if (!open()) { tab.close(); return; }
-      this._waiting = { platform: o.platform, tid: o.tid };
+      const r = await accounts.startLogin(pl, tid, reId, !!tab);
+      if (!tab) { window.location.assign(r.url); return; }
+      this._waiting = { platform: pl, tid };
       tab.location.href = r.url;
-      this.toast('Log in to ' + o.platform + ' in the new tab.');
-    }, () => { tab?.close(); if (open()) this.mockConnect(o); }, (code, message) => {
+      this.toast('Log in to ' + pl + ' in the new tab.');
+    } catch (e) {
       tab?.close();
-      if (code === 'wrong_origin') this.toast(message);
-    });
+      const code = e instanceof AgentCallError ? e.code : 'server';
+      this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. Try again.');
+    }
+  }
+
+  /** The message for a login page that came back without an account. */
+  private loginError(pl: Platform, error: string | null) {
+    return error === 'denied' ? pl + ' was not connected. You can try again.'
+      : error === 'no_pages' ? 'No Facebook Page was shared. Try again and pick a Page you manage.'
+      : "I couldn't connect " + pl + '. Try again.';
   }
 
   /**
@@ -915,14 +939,14 @@ export class AgencyApp extends Component<AppProps, AppState> {
     if (!t) { this.toast("I couldn't find that AI talent. Connect the account again."); return; }
     const reId = r.re && t.accounts.some((a) => a.id === r.re) ? r.re : null;
     this.openTalent(t.id, 'accounts');
-    this.setState((s) => ({
-      ov: { kind: 'connect', tid: t.id, platform: r.platform, chosen: true, handle: '', reId, ref: r.ref },
-      jobs: { ...s.jobs, connect: { phase: r.error ? 'failed' : 'idle' } },
-    }), () => {
-      if (r.error === 'denied') this.toast(r.platform + ' was not connected. You can try again.');
-      if (r.error === 'no_pages') this.toast('No Facebook Page was shared. Try again and pick a Page you manage.');
-      if (!r.error) this.connectNow();
-    });
+    if (r.error || !r.ref) { this.toast(this.loginError(r.platform, r.error)); return; }
+    const o = { kind: 'connect', tid: t.id, platform: r.platform, chosen: true, handle: '', reId };
+    this.toast('Connecting ' + r.platform + '…');
+    Promise.all(r.ref.split(',').map((ref) => accounts.read(r.platform, { ref }))).then((rs) => {
+      // Facebook returns every Page the student shared with the app, so the student picks this talent's Page.
+      if (rs.length > 1) { this.setState((s) => ({ ov: { ...o, pick: rs }, jobs: { ...s.jobs, connect: { phase: 'idle' } } })); return; }
+      this.addReads(o, rs);
+    }, () => this.toast("I couldn't read that " + r.platform + ' account. Try again.'));
   }
 
   /**
@@ -935,12 +959,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     if (!here) this.openForm('new');
     this.setState((s) => (s.form ? { form: { ...s.form, step: 2, resumed: false } } : null));
     const pl = r.platform;
-    if (r.error || !r.ref) {
-      this.toast(r.error === 'denied' ? pl + ' was not connected. You can try again.'
-        : r.error === 'no_pages' ? 'No Facebook Page was shared. Try again and pick a Page you manage.'
-        : "I couldn't connect " + pl + '. Try again.');
-      return;
-    }
+    if (r.error || !r.ref) { this.toast(this.loginError(pl, r.error)); return; }
     this.setFormAcc(pl, { handle: '', phase: 'loading' });
     Promise.all(r.ref.split(',').map((ref) => accounts.read(pl, { ref }))).then((rs) => {
       if (rs.length === 1) { this.setFormAcc(pl, { handle: rs[0].handle, phase: 'on', read: rs[0], readAt: Date.now() }); return; }
@@ -1097,21 +1116,9 @@ export class AgencyApp extends Component<AppProps, AppState> {
   private formLogin(pl: Platform) {
     const tab = this.loginTab();
     this.setState((s) => (s.form ? { form: { ...s.form, accs: { ...(s.form.accs || {}), [pl]: { handle: '', phase: 'loading' } } } } : null), async () => {
-      try {
-        // Without a new tab the browser leaves this page, so the draft must be saved first.
-        await this._sync?.flush();
-        const r = await accounts.startLogin(pl, FORM_TID, null, !!tab);
-        if (!tab) { window.location.assign(r.url); return; }
-        this._waiting = { platform: pl, tid: FORM_TID };
-        tab.location.href = r.url;
-        this.setFormAcc(pl, null);
-        this.toast('Log in to ' + pl + ' in the new tab.');
-      } catch (e) {
-        tab?.close();
-        this.setFormAcc(pl, null);
-        const code = e instanceof AgentCallError ? e.code : 'server';
-        this.toast(code === 'wrong_origin' && e instanceof Error ? e.message : "I couldn't open the " + pl + ' login page. Try again.');
-      }
+      // Without a new tab the browser leaves this page; goLogin saves the draft first.
+      await this.goLogin(pl, FORM_TID, null, tab);
+      this.setFormAcc(pl, null);
     });
   }
 

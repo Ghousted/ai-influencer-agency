@@ -54,7 +54,7 @@ function accountRows(app: AgencyApp, t: Talent) {
       canRefresh: a.mode === 'live' && !lost && !busy,
       canReconnect: lost,
       refresh: () => app.refreshAccount(t.id, a.id),
-      reconnect: () => app.openConnect(t.id, a.id),
+      reconnect: () => app.connectAccount(t.id, a.platform, a.id),
       disconnect: () => app.setState({ ov: { kind: 'delAcct', tid: t.id, aid: a.id, platform: a.platform, handle: a.handle } }),
     };
   };
@@ -72,7 +72,7 @@ function accountRows(app: AgencyApp, t: Talent) {
       logoBg: logoBg(p), filter: on ? 'none' : 'grayscale(1) opacity(.55)',
       noLogo: !LOGO[p], ytBg: '#FF0033',
       isOn: on, isOff: !on, badge: badge[0], badgeBg: badge[1], badgeFg: badge[2],
-      connect: () => app.openConnect(t.id, null, p),
+      connect: () => app.connectAccount(t.id, p),
       accs: list.map(accRow),
     };
   });
@@ -216,7 +216,7 @@ export function talentView(app: AgencyApp) {
     hasAccounts: t.accounts.length > 0,
     lost: !!lostAcc,
     lostText: lostAcc ? lostAcc.platform + ' ' + lostAcc.handle + ' lost its connection. These are the last good numbers' + (t.stats ? ' from ' + t.stats.taken : '') + '.' : '',
-    reconnectLost: () => { if (lostAcc) app.openConnect(t.id, lostAcc.id); },
+    reconnectLost: () => { if (lostAcc) app.connectAccount(t.id, lostAcc.platform, lostAcc.id); },
     handleOnly: t.accounts.length > 0 && !hasLive,
     hasMetrics: hasLive && !!t.stats,
     metrics: hasLive ? app.metricCards(t) : [],
