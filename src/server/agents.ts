@@ -1,5 +1,8 @@
 // The four agents (PRD section 6): Grow, Scout, Content and Pitch.
 // Each one turns a talent into a JSON answer that matches the app's own types.
+// Profile writes a new talent's niche and character story from its accounts' own words.
+import type { AccountAbout } from './account-error';
+import { parseReadRequest, type ReadRequest } from './accounts';
 import { AgentError, chatJson } from './openrouter';
 
 export type AgentName = 'grow' | 'scout' | 'content' | 'pitch';
@@ -179,4 +182,56 @@ export async function runAgent(agent: AgentName, req: AgentRequest) {
       return { pitch: out.pitch, profile: out.profile, hasNumbers: !!s };
     }
   }
+}
+
+// ---- Profile ------------------------------------------------------------------
+
+export type ProfileRequest = {
+  name: string;
+  /** The talent's accounts, as the account reader takes them. */
+  accounts: ReadRequest[];
+  /** Character stories already shown. "Fill in again" must give a new one. */
+  avoid: string[];
+};
+
+export function parseProfileRequest(body: unknown): ProfileRequest {
+  const b = body as Partial<ProfileRequest> | null;
+  if (!b || !isStr(b.name, 120)) throw new AgentError('bad_request', 'name is required.');
+  if (!Array.isArray(b.accounts) || !b.accounts.length || b.accounts.length > 8) throw new AgentError('bad_request', 'accounts must hold 1 to 8 accounts.');
+  let accounts: ReadRequest[];
+  try {
+    accounts = b.accounts.map(parseReadRequest);
+  } catch (e) {
+    throw new AgentError('bad_request', (e as Error).message);
+  }
+  const avoid = Array.isArray(b.avoid) ? b.avoid.filter((x): x is string => isStr(x)).slice(0, 5) : [];
+  return { name: b.name, accounts, avoid };
+}
+
+const PROFILE_SCHEMA = obj({
+  niche: str('The niche in 2 to 5 words, e.g. "Budget travel in the Philippines".'),
+  story: str('The character story: 2 or 3 sentences, at most 70 words, about who the AI talent is and what they post.'),
+});
+
+const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + '…' : s);
+
+/**
+ * Write a niche and character story. `abouts` are the accounts the server could read; `others` are
+ * the accounts it could not read (added by handle, or a platform the server does not read yet).
+ */
+export async function runProfile(name: string, abouts: AccountAbout[], others: { platform: string; handle: string }[], avoid: string[]) {
+  const lines = abouts.map((a) => [
+    `${a.platform} ${a.handle}`,
+    `Bio: ${a.bio ? clip(a.bio, 600) : 'none'}`,
+    a.posts.length ? `Newest posts:\n${a.posts.map((p) => '- ' + clip(p.replace(/\s+/g, ' '), 300)).join('\n')}` : 'No posts yet.',
+  ].join('\n'));
+  if (others.length) lines.push(`Accounts with no text to read: ${others.map((o) => `${o.platform} ${o.handle}`).join(', ')}`);
+  const out = await chatJson<{ niche: string; story: string }>({
+    name: 'talent_profile',
+    schema: PROFILE_SCHEMA,
+    maxTokens: 1200,
+    system: `${VOICE} You are the Profile agent. From an AI talent's own accounts, you write the talent's niche and character story. The app uses them to suggest brands and write pitches, so they must say what the talent posts and who watches it. Use only what the bios and posts show. When the accounts show little, write a short, plain story and do not invent details such as an age, a job or a city.`,
+    user: `AI talent: ${name}\n\n${lines.join('\n\n')}\n\nWrite the niche and the character story. Refer to the talent as ${name}.${avoidLine(avoid)}`,
+  });
+  return { niche: out.niche.trim(), story: out.story.trim() };
 }

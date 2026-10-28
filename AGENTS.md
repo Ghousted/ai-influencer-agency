@@ -12,8 +12,10 @@ Next.js 15 (App Router), React 19, TypeScript. App data is mock data kept in the
 The agents also have a real API through OpenRouter (not wired into the screens yet):
 
 - `src/server/openrouter.ts` — server-only client. Asks for JSON that matches a schema, with a timeout.
-- `src/server/agents.ts` — the Grow, Scout, Content and Pitch prompts, schemas and input checks.
+- `src/server/agents.ts` — the Grow, Scout, Content, Pitch and Profile prompts, schemas and input checks.
 - `POST /api/agents/{grow|scout|content|pitch}` — body `{ talent, avoid?, brand?, sender? }`.
+- `POST /api/agents/profile` — body `{ name, accounts: [{ platform, ref?, handle? }], avoid? }`, returns `{ niche, story }`.
+  Reads each account's bio and newest posts (`readAbout` in `src/server/accounts.ts`). "Fill in from accounts" uses it.
   Errors: 400 `bad_request`, 409 `needs_account`, 503 `no_key`, 504 `timeout`, 502 `upstream` / `bad_output`.
 - `GET /api/health` — whether `OPENROUTER_API_KEY` is set, the model, and which platforms the server reads.
 - `src/agency/api.ts` — typed browser helpers (`agents.grow(talent)`, `accounts.read(platform, …)`).

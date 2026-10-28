@@ -74,6 +74,13 @@ export const agents = {
       brand: { name: b.name, what: b.what, why: b.why, where: b.where },
       sender,
     }),
+
+  /**
+   * A niche and character story from the talent's accounts. The server reads each account's bio and newest posts;
+   * an account it cannot read goes in by handle only. `avoid` holds stories already shown, so Fill in again gives a new one.
+   */
+  profile: (name: string, accounts: { platform: Platform; handle: string; ref?: string }[], avoid: string[]) =>
+    call<{ niche: string; story: string }>('profile', { name, accounts, avoid }),
 };
 
 export type AccountRead = { handle: string; ref: string; stats: AccountStats; few: boolean };

@@ -1,7 +1,7 @@
 // Instagram API with Instagram Login. Server only: it reads INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET.
 // Works for Business and Creator accounts. In Development mode only Instagram Testers of the Meta app can connect.
 // Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
-import { AccountError, type AccountRead } from './account-error';
+import { ABOUT_POSTS, AccountError, type AccountAbout, type AccountRead } from './account-error';
 import { cryptoConfigured } from './crypto';
 import { platformFetch, redirectUri } from './login-common';
 import { supabaseConfigured } from './supabase';
@@ -132,5 +132,26 @@ export async function readInstagram(userId: string, ref: string): Promise<Accoun
     // Instagram shares watch time only for reels, and Meta still marks that number "in development".
     stats: { posts: [a.posts, b.posts], views: [a.views, b.views], eng: [a.eng, b.eng], time: null },
     few: (me.media_count ?? 0) < FEW_POSTS,
+  };
+}
+
+/** The bio and the newest captions, for the Profile agent. */
+export async function aboutInstagram(userId: string, ref: string): Promise<AccountAbout> {
+  const token = await freshToken(userId, ref);
+  const q = (fields: Record<string, string>) => new URLSearchParams({ ...fields, access_token: token });
+  let me: { username: string; name?: string; biography?: string };
+  try {
+    me = await call(`${GRAPH}/me?${q({ fields: 'username,name,biography' })}`);
+  } catch (e) {
+    if (e instanceof AccountError && (e.code === 'reconnect' || e.code === 'timeout')) throw e;
+    // Some accounts do not share the bio with this login. Read the account without it.
+    me = await call(`${GRAPH}/me?${q({ fields: 'username,name' })}`);
+  }
+  const media = await call<{ data?: { caption?: string }[] }>(`${GRAPH}/me/media?${q({ fields: 'caption', limit: String(ABOUT_POSTS) })}`);
+  return {
+    platform: 'Instagram',
+    handle: '@' + me.username,
+    bio: [me.name, me.biography].filter(Boolean).join(' — '),
+    posts: (media.data || []).map((m) => m.caption || '').filter(Boolean),
   };
 }

@@ -1,7 +1,7 @@
 // YouTube Data API v3 reader. Server only: it reads YOUTUBE_API_KEY from the environment.
 // Public numbers only, found by handle, so there is no sign-in and no app review.
 // YouTube does not share watch time without the owner's sign-in, so `time` is always null.
-import { AccountError, type AccountRead } from './account-error';
+import { ABOUT_POSTS, AccountError, type AccountAbout, type AccountRead } from './account-error';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const TIMEOUT_MS = 15000;
@@ -94,5 +94,22 @@ export async function readYoutube({ handle, ref }: { handle?: string; ref?: stri
     ref: c.id,
     stats: { posts: [a.posts, b.posts], views: [a.views, b.views], eng: [a.eng, b.eng], time: null },
     few: Number(c.statistics.videoCount || 0) < FEW_VIDEOS,
+  };
+}
+
+/** The channel description and the newest video titles, for the Profile agent. */
+export async function aboutYoutube({ handle, ref }: { handle?: string; ref?: string }): Promise<AccountAbout> {
+  const by: Record<string, string> = ref ? { id: ref } : { forHandle: '@' + (handle || '') };
+  const ch = await get<{ items?: (Channel & { snippet: { description?: string } })[] }>('channels', { part: 'snippet,contentDetails', ...by });
+  const c = ch.items?.[0];
+  if (!c) throw new AccountError('not_found', 'No YouTube channel has that handle.');
+  const pl = await get<{ items?: { snippet: { title: string } }[] }>('playlistItems', {
+    part: 'snippet', playlistId: c.contentDetails.relatedPlaylists.uploads, maxResults: String(ABOUT_POSTS),
+  });
+  return {
+    platform: 'YouTube',
+    handle: c.snippet.customUrl ? (c.snippet.customUrl.startsWith('@') ? c.snippet.customUrl : '@' + c.snippet.customUrl) : '@' + (handle || c.snippet.title),
+    bio: [c.snippet.title, c.snippet.description].filter(Boolean).join(' — '),
+    posts: (pl.items || []).map((i) => i.snippet.title).filter(Boolean),
   };
 }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ChangeEvent } from 'react';
 import type { AgencyApp } from '../AgencyApp';
-import { PLATFORMS, TCOLORS, draftFromAccounts } from '../logic';
+import { PLATFORMS, TCOLORS } from '../logic';
 import type { Talent } from '../types';
 
 /** Logo files that exist in /public/assets. Others show the fallback mark. */
@@ -86,7 +86,7 @@ function formView(app: AgencyApp) {
 
   // Accounts (new talent only; an existing talent manages them on its page).
   const accs: Record<string, any> = f.accs || {};
-  const onAccs = Object.entries<any>(accs).filter(([, a]) => a && a.phase === 'on').map(([platform, a]) => ({ platform, handle: a.handle as string }));
+  const onAccs = Object.entries<any>(accs).filter(([, a]) => a && a.phase === 'on').map(([platform, a]) => ({ platform, handle: a.handle as string, ref: a.read?.ref as string | undefined }));
   const anyLoading = Object.values<any>(accs).some((a) => a && a.phase === 'loading');
   const setAcc = (pl: string, val: any) => app.setState((s) => {
     const next = { ...((s.form && s.form.accs) || {}) };
@@ -120,19 +120,9 @@ function formView(app: AgencyApp) {
   });
 
   // Fill in from accounts. A new talent uses the accounts from step 2; an existing talent uses its own accounts.
-  const fillSrc = isNew ? onAccs : (editT ? editT.accounts.map((a) => ({ platform: a.platform as string, handle: a.handle })) : []);
+  const fillSrc = isNew ? onAccs : (editT ? editT.accounts.map((a) => ({ platform: a.platform as string, handle: a.handle, ref: a.ref })) : []);
   const filling = !!f.filling;
-  const fill = () => {
-    if (!fillSrc.length || filling) return;
-    if (isNew) { app.formFill(); return; }
-    set('filling', true);
-    setTimeout(() => {
-      const cur = app.state.form;
-      if (!cur || cur.mode !== 'edit' || cur.id !== f.id) return;
-      const d = draftFromAccounts(cur.name, fillSrc);
-      app.setState((s) => (s.form ? { form: { ...s.form, filling: false, filled: fillSrc.map((a) => a.handle).join(', '), niche: d.niche, story: d.story } } : null));
-    }, 1600);
-  };
+  const fill = () => app.formFill(fillSrc);
 
   // Rules: Save stays off until name, picture, niche and character story are all filled.
   const name = (f.name || '').trim(), niche = (f.niche || '').trim(), story = (f.story || '').trim();
