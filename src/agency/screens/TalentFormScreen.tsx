@@ -167,7 +167,13 @@ export function TalentFormScreen({ v }: { v: any }) {
                       {(p.isIdle) ? (
                         <>
                         <div style={{ flex: "1 1 260px", display: "flex", gap: "8px" }}>
-                          <input style={{ flex: "1", minWidth: "0", height: "40px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 12px", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#18181b" }} value={p.handle} onChange={p.onHandle} placeholder="@handle" />
+                          {(p.login) ? (
+                            <span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
+                              {p.loginText}
+                            </span>
+                          ) : (
+                            <input style={{ flex: "1", minWidth: "0", height: "40px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 12px", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#18181b" }} value={p.handle} onChange={p.onHandle} placeholder="@handle" />
+                          )}
                           <button style={{ height: "40px", padding: "0 16px", borderRadius: "9999px", border: "none", background: p.btnBg, color: p.btnFg, font: "700 13px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={p.connect}>
                             Connect
                           </button>
@@ -178,7 +184,7 @@ export function TalentFormScreen({ v }: { v: any }) {
                         <>
                         <div style={{ flex: "1 1 260px", display: "flex", alignItems: "center", gap: "10px", font: "600 13px 'Plus Jakarta Sans',sans-serif", color: "#3f3f46" }}>
                           <span style={{ flex: "1", height: "8px", borderRadius: "9999px", background: "#E4E4E7", animation: "aia-pulse 1.2s ease-in-out infinite" }} />
-                          Connecting {p.handle}
+                          {p.loadingText}
                         </div>
                         </>
                       ) : null}

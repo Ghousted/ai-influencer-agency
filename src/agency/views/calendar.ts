@@ -186,7 +186,7 @@ export function overlaysView(app: AgencyApp) {
       idle: !j.loading && !j.bad && !o.pick,
       // Several accounts came back from a login page (Facebook Pages): the student picks this talent's one.
       picking: !j.loading && !j.bad && !!o.pick,
-      pickTitle: 'Which Page belongs to ' + (t ? t.name : 'this AI talent') + '?',
+      pickTitle: 'Which Page belongs to ' + (t ? t.name : (s.form && s.form.name) || 'this AI talent') + '?',
       picks: (o.pick || []).map((r: { handle: string }, i: number) => ({ label: r.handle, go: () => app.pickAccount(i) })),
       loading: j.loading,
       long: j.long,

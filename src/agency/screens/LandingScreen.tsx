@@ -65,7 +65,7 @@ export function LandingScreen({ v }: { v: any }) {
                   </div>
                 </div>
               </div>
-              <div style={{ position: "relative", zIndex: "2", maxWidth: "760px", width: "100%", margin: "0 auto", padding: "12px 24px 48px", flexShrink: "0", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", textAlign: "center" }}>
+              <div style={{ position: "relative", zIndex: "2", maxWidth: "760px", width: "100%", margin: "0 auto", padding: "40px 24px 32px", flexShrink: "0", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", textAlign: "center" }}>
                 <h1 style={{ animation: "landUp .9s cubic-bezier(.2,.8,.2,1) 1.25s both", margin: "0", font: "800 clamp(32px,4.6vw,54px)/1.06 'Plus Jakarta Sans',sans-serif", letterSpacing: "-0.03em", textWrap: "balance" }} data-land="1" data-grid-avoid="1">
                   Manage your AI talents as a small agency.
                 </h1>
