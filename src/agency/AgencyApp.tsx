@@ -861,8 +861,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   editPitch(id: string, field: 'pitch' | 'profile', val: string) {
     const p = this.state.pitches.find((x) => x.id === id)!;
+    // A sent pitch is the record of what went to the brand, so it stays as it was.
+    if (p.status === 'sent') return;
     const patch: Partial<Pitch> = { [field]: val };
-    if (p.status === 'approved' || p.status === 'sent') { patch.status = 'draft'; this.setState({ editedAfterApprove: true }); }
+    if (p.status === 'approved') { patch.status = 'draft'; this.setState({ editedAfterApprove: true }); }
     this.updPitch(id, patch);
   }
 
