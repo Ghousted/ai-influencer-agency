@@ -84,6 +84,8 @@ const LOGIN_PLATFORMS: Platform[] = ['Instagram', 'Facebook', 'TikTok'];
 /** The tid a login page carries when it was opened from the new AI talent form (the talent has no id yet). */
 const FORM_TID = 'new-talent';
 const WAITING_KEY = 'aia-waiting-login';
+/** The ids of the demo agency's AI talents (demoData). */
+const DEMO_IDS = ['luna', 'paolo', 'bea'];
 
 const PERSISTED = ['signedIn', 'user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
 const ACCOUNT_KEYS = ['user', 'agencyName', 'talents', 'pitches', 'posts', 'draft'] as const;
@@ -234,6 +236,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     } catch { /* no BroadcastChannel: logins run in this tab */ }
     const demo = (this.props.startAt ?? 'Start page') === 'Signed in';
     if (demo) {
+      // ?demo is a look around: it is never saved over the agency kept in this browser.
+      this._demoRun = true;
       this._hydrated = true;
       this.login();
     } else if (supabase()) {
@@ -260,7 +264,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       const s = this.withDraft(this.state);
       this._sync?.schedule({ talents: s.talents, pitches: s.pitches, posts: s.posts, draft: s.draft });
     } else {
-      saveState(this.withDraft(this.state), PERSISTED);
+      if (!this._demoRun) saveState(this.withDraft(this.state), PERSISTED);
     }
   }
 
@@ -576,7 +580,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }
     // One-time import: an agency made in this browser before sign-in moves into the database.
     const local = loadAccount(p.email) as Partial<AppState> | null;
-    const importLocal = !data.talents.length && !!local?.talents?.length;
+    // The demo agency (Luna, Paolo, Bea) is never imported as the student's own.
+    const importLocal = !data.talents.length && !!local?.talents?.length && !local.talents.every((t) => DEMO_IDS.includes((t as Talent).id));
     const loaded = importLocal
       ? { talents: local!.talents as Talent[], pitches: (local!.pitches as Pitch[]) || [], posts: (local!.posts as ScheduledPost[]) || [] }
       : data;
@@ -616,6 +621,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   async submitLogin() {
     const a = this.state.auth;
+    this._demoRun = false;
     if (!a.email.trim() || !a.password.trim()) { this.setState({ authErr: 'Please fill in your email and password.' }); return; }
     if (supabase()) {
       if (this.state.authBusy) return;
@@ -637,6 +643,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
 
   async signup() {
     const a = this.state.auth;
+    this._demoRun = false;
     if (!a.name.trim() || !a.email.trim() || !a.password.trim() || !a.agency.trim()) { this.setState({ authErr: 'Please fill in all four fields.' }); return; }
     if (a.password.length < 8) { this.setState({ authErr: 'Your password must have 8 characters or more.' }); return; }
     if (supabase()) {
@@ -671,7 +678,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       this._sync?.stop();
       this._sync = undefined;
       backend.signOut();
-    } else if (keepAccount && this.state.signedIn) {
+    } else if (keepAccount && this.state.signedIn && !this._demoRun) {
       saveAccount(this.state.user.email, this.withDraft(this.state), ACCOUNT_KEYS);
     }
     this.setState({ signedIn: false, cloud: false, userId: null, authBusy: false, route: 'start', user: { name: 'Mika Santos', email: 'mika.santos@email.com' }, agencyName: "Mika's Talent House", talents: [], pitches: [], posts: [], draft: null, form: null, ov: null, acctMenu: false, jobs: {}, ui: {}, renameVal: '', editedAfterApprove: false, histTab: 'all', calMonth: null, calSel: null, calFilter: null });
@@ -1262,6 +1269,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     }
   }
   private _staleTried = new Set<string>();
+  private _demoRun = false;
 
   refreshAccount(tid: string, aid: string) {
     const a0 = this.T(tid)?.accounts.find((x) => x.id === aid);
