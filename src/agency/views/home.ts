@@ -244,6 +244,9 @@ export function homeView(app: AgencyApp) {
     ideas: openIdeas.slice(0, 5),
     ideasCount: nIdeas ? (nIdeas > 5 ? '5 of ' + nIdeas : nIdeas + (nIdeas === 1 ? ' idea' : ' ideas')) : '',
     noIdeas: !nIdeas,
+    noIdeasText: T.some((t) => t.accounts.some((a) => a.mode === 'live'))
+      ? 'No open ideas. New ideas show here when the agents write them.'
+      : 'Connect an account. Then ideas to grow each AI talent show here.',
 
     pc,
     hasPitches: totalP > 0,

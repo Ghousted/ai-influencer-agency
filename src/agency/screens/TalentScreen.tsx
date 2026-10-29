@@ -705,7 +705,7 @@ export function TalentScreen({ v }: { v: any }) {
                     </>
                   ) : null}
                   <div style={{ position: "relative" }}>
-                    <div style={{ display: "flex", gap: "16px", alignItems: "stretch", overflowX: "auto", scrollSnapType: "x mandatory", scrollPadding: "0 2px", padding: "2px 2px 12px", scrollbarWidth: "none", overscrollBehaviorX: "contain" }} ref={cur.content.railRef}>
+                    <div style={{ display: "flex", gap: "16px", alignItems: "stretch", overflowX: "auto", scrollSnapType: "x mandatory", scrollPadding: "0 2px", padding: "2px 2px 12px", scrollbarWidth: "thin", overscrollBehaviorX: "contain" }} ref={cur.content.railRef}>
                       {(cur.content.items || []).map((c: any, c_i: number) => (
                         <Fragment key={c_i}>
                           <div style={{ flex: "0 0 min(340px,86%)", scrollSnapAlign: "start", background: "#fff", borderRadius: "20px", padding: "18px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "14px", opacity: c.op, animation: "aia-in .25s ease-out" }}>
@@ -838,7 +838,7 @@ export function TalentScreen({ v }: { v: any }) {
             <>
             <div style={{ display: "flex", flexDirection: "column", gap: "14px", animation: "aia-in .2s ease-out" }}>
               <p style={{ margin: "0", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#52525b" }}>
-                Brands that fit {cur.first}&apos;s niche and story, and where to approach each. I only suggest. Nothing is sent.
+                Brands that fit {cur.first}&apos;s niche and story, and where to approach each. The app only suggests. Nothing is sent.
               </p>
               {(cur.scout.loading) ? (
                 <>

@@ -829,6 +829,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
   openSchedule(opts?: { postId?: string; tid?: string; cid?: string; date?: string }) {
     const o = opts || {};
     const T = this.state.talents;
+    // A post needs an AI talent: with none, the form could never be saved.
+    if (!T.length) { this.toast('Add an AI talent first. Then you can plan its posts.', { label: 'Add AI talent', run: () => this.openForm('new') }); return; }
     if (o.postId) {
       const p = this.state.posts.find((x) => x.id === o.postId)!;
       this.setState({ ov: { kind: 'schedule', postId: p.id, tid: p.talentId, cid: p.contentId || '', title: p.title, platform: p.platform, date: p.date, time: p.time } });
@@ -1335,6 +1337,11 @@ export class AgencyApp extends Component<AppProps, AppState> {
       const accs = d ? Object.fromEntries(Object.entries<any>(d.accs || {}).filter(([, a]) => a.phase === 'on')) : {};
       this.go('form', { form: d ? { ...d, accs, filling: false, mode: 'new', resumed: true } : { mode: 'new', name: '', niche: '', story: '', pic: null, color: this.nextColor(), resumed: false, step: 1 } });
     }
+  }
+
+  /** Throw away the kept new-talent draft and start an empty form. */
+  startOverForm() {
+    this.setState({ draft: null, form: { mode: 'new', name: '', niche: '', story: '', pic: null, color: this.nextColor(), resumed: false, step: 1 } });
   }
 
   nextColor() {

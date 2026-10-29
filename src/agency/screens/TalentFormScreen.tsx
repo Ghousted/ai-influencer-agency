@@ -23,7 +23,12 @@ export function TalentFormScreen({ v }: { v: any }) {
             <>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", borderRadius: "12px", background: "#EAF2FF", font: "600 14px 'Plus Jakarta Sans',sans-serif", color: "#18181b" }}>
               <span style={{ width: "8px", height: "8px", borderRadius: "9999px", background: "#006AFF" }} />
-              Picking up where you left off
+              <span style={{ flex: "1" }}>
+                Picking up where you left off
+              </span>
+              <button style={{ border: "none", background: "none", padding: "0", color: "#006AFF", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={form.startOver}>
+                Start over
+              </button>
             </div>
             </>
           ) : null}

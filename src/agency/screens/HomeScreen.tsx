@@ -366,7 +366,7 @@ export function HomeScreen({ v }: { v: any }) {
                   {(home.noIdeas) ? (
                     <>
                     <div style={{ font: "500 14px/1.5 'Plus Jakarta Sans',sans-serif", color: "#52525b" }}>
-                      Connect an account. Then ideas to grow each AI talent show here.
+                      {home.noIdeasText}
                     </div>
                     </>
                   ) : null}

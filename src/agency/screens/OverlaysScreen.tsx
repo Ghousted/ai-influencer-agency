@@ -93,7 +93,7 @@ function OverlaysBody({ v }: { v: any }) {
                   <div style={{ font: "500 13px/1.5 'Plus Jakarta Sans',sans-serif", color: "#52525b" }}>
                     The app only reads the numbers. The app does not post or send items.
                   </div>
-                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.connectOff }} onClick={ovl.c.connect} className="dc-h61">
+                  <button style={{ height: "48px", borderRadius: "9999px", border: "none", background: "#006AFF", color: "#fff", font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.connectOff }} onClick={ovl.c.connect} disabled={ovl.c.connectDisabled} title={ovl.c.connectDisabled ? "Type the handle first" : undefined} className="dc-h61">
                     Connect {ovl.c.platform}
                   </button>
                   {(ovl.c.fallback) ? (
@@ -104,7 +104,7 @@ function OverlaysBody({ v }: { v: any }) {
                       </div>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <input style={{ flex: "1", minWidth: "0", height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" aria-label="Handle" />
-                        <button style={{ height: "44px", padding: "0 16px", borderRadius: "9999px", border: "1px solid #E4E4E7", background: "#fff", color: "#18181b", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.handleOff }} onClick={ovl.c.addHandle}>
+                        <button style={{ height: "44px", padding: "0 16px", borderRadius: "9999px", border: "1px solid #E4E4E7", background: "#fff", color: "#18181b", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.handleOff }} onClick={ovl.c.addHandle} disabled={ovl.c.handleDisabled} title={ovl.c.handleDisabled ? "Type the handle first" : undefined}>
                           Add by handle
                         </button>
                       </div>
@@ -158,7 +158,7 @@ function OverlaysBody({ v }: { v: any }) {
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <input style={{ flex: "1", minWidth: "0", height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" aria-label="Handle" />
-                    <button style={{ height: "44px", padding: "0 16px", borderRadius: "9999px", border: "1px solid #E4E4E7", background: "#fff", color: "#18181b", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.handleOff }} onClick={ovl.c.addHandle}>
+                    <button style={{ height: "44px", padding: "0 16px", borderRadius: "9999px", border: "1px solid #E4E4E7", background: "#fff", color: "#18181b", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.handleOff }} onClick={ovl.c.addHandle} disabled={ovl.c.handleDisabled} title={ovl.c.handleDisabled ? "Type the handle first" : undefined}>
                       Add by handle
                     </button>
                   </div>

@@ -185,6 +185,7 @@ export function overlaysView(app: AgencyApp) {
       askHandle,
       fallback: !re && !askHandle,
       connectOff: askHandle && !handle.trim() ? '.5' : '1',
+      connectDisabled: askHandle && !handle.trim(),
       idle: !j.loading && !j.bad && !o.pick,
       // Several accounts came back from a login page (Facebook Pages): the student picks this talent's one.
       picking: !j.loading && !j.bad && !!o.pick,
@@ -193,7 +194,7 @@ export function overlaysView(app: AgencyApp) {
       loading: j.loading,
       long: j.long,
       bad: j.bad,
-      err: app.job('connect').msg || "I couldn't connect that account.",
+      err: app.job('connect').msg || 'The app could not connect that account.',
       platforms: PLATFORMS.map((pl) => {
         const on = pl === o.platform;
         return { label: pl, on, bg: on ? '#EAF2FF' : '#F4F4F5', color: on ? '#006AFF' : '#3f3f46', go: () => setOv({ platform: pl }) };
@@ -202,6 +203,7 @@ export function overlaysView(app: AgencyApp) {
       handle,
       onHandle: (e: ChangeEvent<HTMLInputElement>) => setOv({ handle: e.target.value }),
       handleOff: handle.trim() ? '1' : '.5',
+      handleDisabled: !handle.trim(),
       addHandle,
     };
   }

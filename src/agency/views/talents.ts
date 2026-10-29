@@ -179,6 +179,7 @@ function formView(app: AgencyApp) {
     back: isNew ? 'AI talents' : (editT ? editT.name : 'Back'),
     cancel: () => (isNew ? app.go('talents') : app.go('talent', { talentId: f.id })),
     resumed: isNew && !!f.resumed,
+    startOver: () => app.startOverForm(),
 
     // Wizard
     steps,
