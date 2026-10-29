@@ -159,7 +159,6 @@ export function accountView(app: AgencyApp) {
   const ui = s.ui;
   const nameV: string = ui.acctName ?? s.user.name;
   const emailV: string = ui.acctEmail ?? s.user.email;
-  const notifOn: Record<string, boolean> = ui.notifs || {};
 
   const accs = s.talents.flatMap((t) => t.accounts.map((a) => {
     const lost = a.status === 'lost';
@@ -237,15 +236,8 @@ export function accountView(app: AgencyApp) {
       accCount: accs.length + (accs.length === 1 ? ' account' : ' accounts'),
       noAccs: accs.length === 0,
 
-      notifs: NOTIFS.map((n) => {
-        const on = notifOn[n.k] ?? n.def;
-        return {
-          label: n.label, sub: n.sub, on,
-          track: on ? '#006AFF' : '#E4E4E7',
-          knob: on ? '21px' : '3px',
-          toggle: () => app.setUi({ notifs: { ...(app.state.ui.notifs || {}), [n.k]: !on } }),
-        };
-      }),
+      // The app sends no notifications yet, so the switches show "Coming soon" and do nothing.
+      notifs: NOTIFS.map((n) => ({ label: n.label, sub: n.sub, on: false, track: '#E4E4E7', knob: '3px', toggle: () => {} })),
 
       stats,
 

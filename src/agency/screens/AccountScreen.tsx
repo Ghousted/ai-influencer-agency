@@ -143,12 +143,15 @@ export function AccountScreen({ v }: { v: any }) {
                 ))}
               </div>
               <div style={{ background: "#fff", borderRadius: "20px", padding: "24px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "18px" }}>
-                <h2 style={{ margin: "0", font: "800 17px 'Plus Jakarta Sans',sans-serif" }}>
+                <h2 style={{ margin: "0", display: "flex", alignItems: "center", gap: "10px", font: "800 17px 'Plus Jakarta Sans',sans-serif" }}>
                   Notifications
+                  <span style={{ padding: "3px 10px", borderRadius: "9999px", background: "#F4F4F5", color: "#52525b", font: "700 12px 'Plus Jakarta Sans',sans-serif" }}>
+                    Coming soon
+                  </span>
                 </h2>
                 {(acct.notifs || []).map((nf: any, nf_i: number) => (
                   <Fragment key={nf_i}>
-                    <button style={{ display: "flex", alignItems: "center", gap: "12px", padding: "0", border: "none", background: "none", textAlign: "left", cursor: "pointer" }} onClick={nf.toggle} role="switch" aria-checked={nf.on}>
+                    <button style={{ display: "flex", alignItems: "center", gap: "12px", padding: "0", border: "none", background: "none", textAlign: "left", cursor: "not-allowed", opacity: ".6" }} onClick={nf.toggle} role="switch" aria-checked={nf.on} disabled>
                       <span style={{ flex: "1", minWidth: "0" }}>
                         <span style={{ display: "block", font: "700 14px 'Plus Jakarta Sans',sans-serif", color: "#18181b" }}>
                           {nf.label}
