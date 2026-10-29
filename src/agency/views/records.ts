@@ -6,7 +6,7 @@ import type { Pitch, Talent } from '../types';
 
 type Inp = ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
 
-const tabStyle = (on: boolean) => ({ color: on ? '#18181b' : '#71717a', line: on ? '#006AFF' : 'transparent' });
+const tabStyle = (on: boolean) => ({ on, color: on ? '#18181b' : '#71717a', line: on ? '#006AFF' : 'transparent' });
 
 // ---- Pitch (PRD feature 7) -------------------------------------------------------
 

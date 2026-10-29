@@ -14,6 +14,7 @@ export function shellView(app: AgencyApp) {
   const nav = ([['Home', 'home'], ['Talents', 'talents'], ['Calendar', 'calendar'], ['History', 'history']] as const).map(([label, k]) => ({
     label,
     go: () => app.go(k),
+    on: !!navOn[k],
     bg: navOn[k] ? '#EAF2FF' : 'transparent',
     fg: navOn[k] ? '#006AFF' : '#52525b',
   }));

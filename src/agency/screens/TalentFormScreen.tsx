@@ -90,7 +90,7 @@ export function TalentFormScreen({ v }: { v: any }) {
                       </>
                     ) : null}
                   </div>
-                  <input style={{ display: "none" }} type="file" accept="image/*" onChange={form.onPic} />
+                  <input style={{ position: "absolute", width: "1px", height: "1px", opacity: "0", overflow: "hidden" }} type="file" accept="image/*" onChange={form.onPic} aria-label="Picture" />
                   {(form.hasPic) ? (
                     <>
                     <span style={{ font: "600 12px 'Plus Jakarta Sans',sans-serif", color: "#006AFF" }}>
@@ -172,7 +172,7 @@ export function TalentFormScreen({ v }: { v: any }) {
                               {p.loginText}
                             </span>
                           ) : (
-                            <input style={{ flex: "1", minWidth: "0", height: "40px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 12px", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#18181b" }} value={p.handle} onChange={p.onHandle} placeholder="@handle" />
+                            <input style={{ flex: "1", minWidth: "0", height: "40px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 12px", font: "500 14px 'Plus Jakarta Sans',sans-serif", color: "#18181b" }} value={p.handle} onChange={p.onHandle} placeholder="@handle" aria-label={p.name + ' handle'} />
                           )}
                           <button style={{ height: "40px", padding: "0 16px", borderRadius: "9999px", border: "none", background: p.btnBg, color: p.btnFg, font: "700 13px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={p.connect}>
                             Connect

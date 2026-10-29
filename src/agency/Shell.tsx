@@ -22,7 +22,7 @@ export function Shell({ v, children }: { v: any; children: ReactNode }) {
               <nav className="aia-nav" style={{ display: 'flex', gap: '4px', flex: '1' }}>
                 {(nav || []).map((n: any, i: number) => (
                   <Fragment key={i}>
-                    <button style={{ height: '36px', padding: '0 14px', border: 'none', borderRadius: '9999px', background: n.bg, color: n.fg, font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: 'pointer' }} onClick={n.go} className="dc-hover-blue">
+                    <button style={{ height: '36px', padding: '0 14px', border: 'none', borderRadius: '9999px', background: n.bg, color: n.fg, font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: 'pointer' }} onClick={n.go} aria-current={n.on ? 'page' : undefined} className="dc-hover-blue">
                       {n.label}
                     </button>
                   </Fragment>

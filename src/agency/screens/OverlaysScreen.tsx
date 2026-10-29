@@ -77,7 +77,7 @@ function OverlaysBody({ v }: { v: any }) {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                       {(ovl.c.platforms || []).map((pl: any, pl_i: number) => (
                         <Fragment key={pl_i}>
-                          <button style={{ height: "46px", borderRadius: "12px", border: "none", background: pl.bg, color: pl.color, font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={pl.go}>
+                          <button style={{ height: "46px", borderRadius: "12px", border: "none", background: pl.bg, color: pl.color, font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={pl.go} aria-pressed={pl.on}>
                             {pl.label}
                           </button>
                         </Fragment>
@@ -87,7 +87,7 @@ function OverlaysBody({ v }: { v: any }) {
                   ) : null}
                   {(ovl.c.askHandle) ? (
                     <>
-                    <input style={{ height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" />
+                    <input style={{ height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" aria-label="Handle" />
                     </>
                   ) : null}
                   <div style={{ font: "500 13px/1.5 'Plus Jakarta Sans',sans-serif", color: "#52525b" }}>
@@ -103,7 +103,7 @@ function OverlaysBody({ v }: { v: any }) {
                         If the account does not connect, add it by its handle. The app then shows &quot;Numbers not available&quot;.
                       </div>
                       <div style={{ display: "flex", gap: "8px" }}>
-                        <input style={{ flex: "1", minWidth: "0", height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" />
+                        <input style={{ flex: "1", minWidth: "0", height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" aria-label="Handle" />
                         <button style={{ height: "44px", padding: "0 16px", borderRadius: "9999px", border: "1px solid #E4E4E7", background: "#fff", color: "#18181b", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.handleOff }} onClick={ovl.c.addHandle}>
                           Add by handle
                         </button>
@@ -157,7 +157,7 @@ function OverlaysBody({ v }: { v: any }) {
                     {ovl.c.err}
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
-                    <input style={{ flex: "1", minWidth: "0", height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" />
+                    <input style={{ flex: "1", minWidth: "0", height: "44px", border: "none", background: "#FAFAFB", borderRadius: "10px", padding: "0 14px", font: "500 15px 'Plus Jakarta Sans',sans-serif" }} value={ovl.c.handle} onChange={ovl.c.onHandle} placeholder="@handle" aria-label="Handle" />
                     <button style={{ height: "44px", padding: "0 16px", borderRadius: "9999px", border: "1px solid #E4E4E7", background: "#fff", color: "#18181b", font: "700 14px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", opacity: ovl.c.handleOff }} onClick={ovl.c.addHandle}>
                       Add by handle
                     </button>
@@ -207,7 +207,7 @@ function OverlaysBody({ v }: { v: any }) {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {(ovl.sc.talents || []).map((x: any, x_i: number) => (
                     <Fragment key={x_i}>
-                      <button style={{ height: "40px", display: "flex", alignItems: "center", gap: "8px", padding: "0 14px 0 6px", border: "none", borderRadius: "9999px", background: x.bg, boxShadow: x.ring, font: "700 13px 'Plus Jakarta Sans',sans-serif", color: "#18181b", cursor: "pointer" }} onClick={x.go}>
+                      <button style={{ height: "40px", display: "flex", alignItems: "center", gap: "8px", padding: "0 14px 0 6px", border: "none", borderRadius: "9999px", background: x.bg, boxShadow: x.ring, font: "700 13px 'Plus Jakarta Sans',sans-serif", color: "#18181b", cursor: "pointer" }} onClick={x.go} aria-pressed={x.on}>
                         <span style={{ width: "28px", height: "28px", borderRadius: "9999px", backgroundColor: x.color, backgroundImage: x.picBg, backgroundSize: "cover", backgroundPosition: "center" }} />
                         {x.name}
                       </button>
@@ -236,7 +236,7 @@ function OverlaysBody({ v }: { v: any }) {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {(ovl.sc.plats || []).map((pl: any, pl_i: number) => (
                     <Fragment key={pl_i}>
-                      <button style={{ height: "38px", padding: "0 16px", borderRadius: "9999px", border: `1px solid ${pl.bd}`, background: pl.bg, color: pl.fg, font: "700 13px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={pl.go}>
+                      <button style={{ height: "38px", padding: "0 16px", borderRadius: "9999px", border: `1px solid ${pl.bd}`, background: pl.bg, color: pl.fg, font: "700 13px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={pl.go} aria-pressed={pl.on}>
                         {pl.label}
                       </button>
                     </Fragment>
@@ -318,7 +318,7 @@ function OverlaysBody({ v }: { v: any }) {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {(ovl.dm.reasons || []).map((rs: any, rs_i: number) => (
                     <Fragment key={rs_i}>
-                      <button style={{ height: "36px", padding: "0 14px", borderRadius: "9999px", border: `1px solid ${rs.bd}`, background: rs.bg, color: rs.fg, font: "700 13px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={rs.go}>
+                      <button style={{ height: "36px", padding: "0 14px", borderRadius: "9999px", border: `1px solid ${rs.bd}`, background: rs.bg, color: rs.fg, font: "700 13px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={rs.go} aria-pressed={rs.on}>
                         {rs.label}
                       </button>
                     </Fragment>

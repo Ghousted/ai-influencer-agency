@@ -73,7 +73,7 @@ export function CalendarScreen({ v }: { v: any }) {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", borderBottom: "1px solid #F1F1F3" }}>
                     {(wk.days || []).map((d: any, d_i: number) => (
                       <Fragment key={d_i}>
-                        <button style={{ minHeight: "104px", minWidth: "0", display: "flex", flexDirection: "column", gap: "4px", padding: "6px", border: "none", borderRight: "1px solid #F1F1F3", background: d.cellBg, boxShadow: d.ring, textAlign: "left", cursor: "pointer", overflow: "hidden" }} onClick={d.select} className="dc-h56">
+                        <button style={{ minHeight: "104px", minWidth: "0", display: "flex", flexDirection: "column", gap: "4px", padding: "6px", border: "none", borderRight: "1px solid #F1F1F3", background: d.cellBg, boxShadow: d.ring, textAlign: "left", cursor: "pointer", overflow: "hidden" }} onClick={d.select} aria-pressed={d.isSel} className="dc-h56">
                           <span style={{ width: "24px", height: "24px", borderRadius: "9999px", background: d.numBg, color: d.numColor, font: "700 12px 'Plus Jakarta Sans',sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {d.day}
                           </span>

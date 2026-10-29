@@ -207,6 +207,7 @@ export function talentView(app: AgencyApp) {
     tabs: TABS.map(([label, k]) => ({
       label,
       go: () => { if (s.colorOpen) app.setState({ colorOpen: false }); app.setTab(k); },
+      on: tab === k,
       color: tab === k ? '#18181b' : '#71717a',
       line: tab === k ? '#006AFF' : 'transparent',
     })),

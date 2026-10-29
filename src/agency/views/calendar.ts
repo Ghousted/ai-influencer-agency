@@ -47,6 +47,7 @@ export function calendarView(app: AgencyApp) {
       const list = byDay[k] || [];
       days.push({
         day: String(d.getDate()),
+        isSel,
         cellBg: isSel ? '#F5F9FF' : inMonth ? '#fff' : '#FAFAFB',
         ring: isSel ? 'inset 0 0 0 2px #006AFF' : 'none',
         numBg: isToday ? '#006AFF' : 'transparent',
@@ -195,7 +196,7 @@ export function overlaysView(app: AgencyApp) {
       err: app.job('connect').msg || "I couldn't connect that account.",
       platforms: PLATFORMS.map((pl) => {
         const on = pl === o.platform;
-        return { label: pl, bg: on ? '#EAF2FF' : '#F4F4F5', color: on ? '#006AFF' : '#3f3f46', go: () => setOv({ platform: pl }) };
+        return { label: pl, on, bg: on ? '#EAF2FF' : '#F4F4F5', color: on ? '#006AFF' : '#3f3f46', go: () => setOv({ platform: pl }) };
       }),
       connect: () => app.connectNow(),
       handle,
@@ -212,7 +213,7 @@ export function overlaysView(app: AgencyApp) {
       reasons: REASONS.map((label) => {
         const on = label === reason;
         return {
-          label,
+          label, on,
           bd: on ? '#006AFF' : '#E4E4E7',
           bg: on ? '#EAF2FF' : '#fff',
           fg: on ? '#006AFF' : '#18181b',
@@ -285,7 +286,7 @@ export function overlaysView(app: AgencyApp) {
       talents: s.talents.map((x) => {
         const on = x.id === o.tid;
         return {
-          name: x.name,
+          name: x.name, on,
           color: x.color || '#006AFF',
           picBg: picBg(x),
           bg: on ? '#EAF2FF' : '#fff',
@@ -306,7 +307,7 @@ export function overlaysView(app: AgencyApp) {
       onTitle: (e: ChangeEvent<HTMLInputElement>) => setOv({ title: e.target.value }),
       plats: PLATFORMS.map((pl) => {
         const on = pl === o.platform;
-        return { label: pl, bd: on ? '#006AFF' : '#E4E4E7', bg: on ? '#EAF2FF' : '#fff', fg: on ? '#006AFF' : '#18181b', go: () => setOv({ platform: pl }) };
+        return { label: pl, on, bd: on ? '#006AFF' : '#E4E4E7', bg: on ? '#EAF2FF' : '#fff', fg: on ? '#006AFF' : '#18181b', go: () => setOv({ platform: pl }) };
       }),
       date: o.date || '',
       onDate: (e: ChangeEvent<HTMLInputElement>) => setOv({ date: e.target.value }),

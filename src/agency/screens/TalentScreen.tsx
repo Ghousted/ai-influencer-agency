@@ -80,7 +80,7 @@ export function TalentScreen({ v }: { v: any }) {
           <div style={{ display: "flex", gap: "28px", borderBottom: "1px solid #E4E4E7" }}>
             {(cur.tabs || []).map((tb: any, tb_i: number) => (
               <Fragment key={tb_i}>
-                <button style={{ height: "44px", padding: "0", border: "none", borderBottom: `2px solid ${tb.line}`, marginBottom: "-1px", background: "none", color: tb.color, font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={tb.go}>
+                <button style={{ height: "44px", padding: "0", border: "none", borderBottom: `2px solid ${tb.line}`, marginBottom: "-1px", background: "none", color: tb.color, font: "700 15px 'Plus Jakarta Sans',sans-serif", cursor: "pointer" }} onClick={tb.go} role="tab" aria-selected={tb.on}>
                   {tb.label}
                 </button>
               </Fragment>
