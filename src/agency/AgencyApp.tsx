@@ -1604,7 +1604,8 @@ export class AgencyApp extends Component<AppProps, AppState> {
         const tip = !real ? d + ' ' + l.toLowerCase() + ': ' + Math.round(a * 100) + '% of peak'
           : n ? d + ' ' + l.toLowerCase() + ': ' + fmt(Math.round(cellV[r][c])) + ' views on average (' + n + (n === 1 ? ' post)' : ' posts)')
           : d + ' ' + l.toLowerCase() + ': no posts';
-        return { bg: n ? col + hex : '#F4F4F5', ring: isB ? '0 0 0 2px #fff,0 0 0 4px ' + col : 'none', tip };
+        // A tap (touch) or Enter (keyboard) shows the tip as a message, because a title tooltip needs a mouse.
+        return { bg: n ? col + hex : '#F4F4F5', ring: isB ? '0 0 0 2px #fff,0 0 0 4px ' + col : 'none', tip, tap: () => this.toast(tip + '.') };
       }),
     }));
     const bestText = stale ? 'Refresh the accounts to see this' : !best.v ? 'Not enough posts yet' : DN[best.c] + ' ' + SL[best.r].toLowerCase();
@@ -1624,7 +1625,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
     return {
       color: col, ticks: [fmt(top), fmt(Math.round(top / 2)), '0'], nowD, prevD, area: nowD + ' L' + X(6).toFixed(1) + ' 200 L' + X(0).toFixed(1) + ' 200 Z',
       chartTitle: real ? 'Views by the day posted' : 'Views each day',
-      pts: now.map((v, d) => ({ x: (X(d) / 600 * 100).toFixed(2) + '%', y: (Y(v) / 200 * 100).toFixed(2) + '%', tip: labels[d] + ': ' + fmt(v) + ' views (last week ' + fmt(prev[d]) + ')' })),
+      pts: now.map((v, d) => ({ x: (X(d) / 600 * 100).toFixed(2) + '%', y: (Y(v) / 200 * 100).toFixed(2) + '%', tip: labels[d] + ': ' + fmt(v) + ' views (last week ' + fmt(prev[d]) + ')', tap: () => this.toast(labels[d] + ': ' + fmt(v) + ' views, last week ' + fmt(prev[d]) + '.') })),
       days: labels.map((l, d) => ({ l, x: (X(d) / 600 * 100).toFixed(2) + '%', c: d === bi ? col : '#71717a' })),
       dayNote, platPick,
       plats, hasHandleOnly: handle.length > 0, handleNote: handle.map((a) => a.platform).join(', ') + ' is added by handle, so it shares no numbers.',

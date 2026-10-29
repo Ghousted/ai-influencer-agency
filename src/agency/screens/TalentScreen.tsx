@@ -204,7 +204,7 @@ export function TalentScreen({ v }: { v: any }) {
                         </svg>
                         {(cur.an.pts || []).map((pt: any, pt_i: number) => (
                           <Fragment key={pt_i}>
-                            <span style={{ position: "absolute", left: pt.x, top: pt.y, width: "10px", height: "10px", margin: "-5px 0 0 -5px", borderRadius: "9999px", background: "#fff", border: `2.5px solid ${cur.an.color}`, boxSizing: "border-box" }} title={pt.tip} />
+                            <span style={{ position: "absolute", left: pt.x, top: pt.y, width: "10px", height: "10px", margin: "-5px 0 0 -5px", borderRadius: "9999px", background: "#fff", border: `2.5px solid ${cur.an.color}`, boxSizing: "border-box" }} title={pt.tip} onClick={pt.tap} role="button" tabIndex={0} aria-label={pt.tip} onKeyDown={(k) => { if (k.key === 'Enter' || k.key === ' ') pt.tap(); }} />
                           </Fragment>
                         ))}
                       </div>
@@ -340,7 +340,7 @@ export function TalentScreen({ v }: { v: any }) {
                           </span>
                           {(hr.cells || []).map((c: any, c_i: number) => (
                             <Fragment key={c_i}>
-                              <span style={{ aspectRatio: "1/1", borderRadius: "6px", background: c.bg, boxShadow: c.ring }} title={c.tip} />
+                              <span style={{ aspectRatio: "1/1", borderRadius: "6px", background: c.bg, boxShadow: c.ring }} title={c.tip} onClick={c.tap} role="button" tabIndex={0} aria-label={c.tip} onKeyDown={(k) => { if (k.key === 'Enter' || k.key === ' ') c.tap(); }} />
                             </Fragment>
                           ))}
                         </Fragment>
@@ -710,7 +710,7 @@ export function TalentScreen({ v }: { v: any }) {
                         <Fragment key={c_i}>
                           <div style={{ flex: "0 0 min(340px,86%)", scrollSnapAlign: "start", background: "#fff", borderRadius: "20px", padding: "18px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "14px", opacity: c.op, animation: "aia-in .25s ease-out" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                              <span style={{ width: "24px", height: "24px", backgroundImage: c.logoBg, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", flexShrink: "0" }} title={c.platform} />
+                              <span style={{ width: "24px", height: "24px", backgroundImage: c.logoBg, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center", flexShrink: "0" }} title={c.platform} role="img" aria-label={c.platform} />
                               <span style={{ height: "26px", padding: "0 10px", borderRadius: "9999px", background: "#EAF2FF", color: "#006AFF", font: "700 12px 'Plus Jakarta Sans',sans-serif", display: "flex", alignItems: "center" }}>
                                 {c.format}
                               </span>

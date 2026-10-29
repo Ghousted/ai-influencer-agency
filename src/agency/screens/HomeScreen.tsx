@@ -183,7 +183,7 @@ export function HomeScreen({ v }: { v: any }) {
                         <div style={{ position: "absolute", inset: "-8px 0", display: "flex" }} onMouseLeave={home.hovOff}>
                           {(home.cols || []).map((hc: any, hc_i: number) => (
                             <Fragment key={hc_i}>
-                              <div style={{ flex: hc.flex, height: "100%", cursor: "crosshair" }} onMouseEnter={hc.enter} onClick={hc.enter} />
+                              <div style={{ flex: hc.flex, height: "100%", cursor: "crosshair" }} onMouseEnter={hc.enter} onClick={hc.enter} onFocus={hc.enter} tabIndex={0} role="img" aria-label={hc.label} />
                             </Fragment>
                           ))}
                         </div>
@@ -243,7 +243,7 @@ export function HomeScreen({ v }: { v: any }) {
                     <div style={{ flex: "1", minHeight: "200px", display: "flex", alignItems: "stretch", gap: "14px", paddingTop: "6px" }}>
                       {(home.eng || []).map((e: any, e_i: number) => (
                         <Fragment key={e_i}>
-                          <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }} title={e.tip}>
+                          <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }} title={e.tip} onClick={e.tap} role="button" tabIndex={0} aria-label={e.tip} onKeyDown={(k) => { if (k.key === 'Enter' || k.key === ' ') e.tap(); }}>
                             <div style={{ flex: "1", width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "5px", borderBottom: "1px solid #E4E4E7" }}>
                               <div style={{ width: "40%", maxWidth: "36px", height: e.h, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
                                 <span style={{ marginTop: "-20px", font: "800 12px 'Plus Jakarta Sans',sans-serif", color: "#18181b", whiteSpace: "nowrap" }}>

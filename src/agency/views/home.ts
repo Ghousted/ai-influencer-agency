@@ -163,6 +163,8 @@ export function homeView(app: AgencyApp) {
   const cols = labels.map((_, i) => ({
     flex: String(i === 0 || i === 6 ? 4 + half : 2 * half),
     enter: () => { if (app.state.homeHover !== i) app.setState({ homeHover: i }); },
+    // Keyboard and screen readers: each day column is focusable and says its total.
+    label: DAY_LONG[labels[i]] + ': ' + fmt(shown.reduce((a, x) => a + x.days[i], 0)) + ' views',
   }));
   const hov = hovIdx == null
     ? { on: false, x: '0%', tx: 'none', day: '', rows: [], total: '' }
@@ -190,6 +192,7 @@ export function homeView(app: AgencyApp) {
     h: (st(t).eng[0] / engMax * 85).toFixed(1) + '%',
     ph: (st(t).eng[1] / engMax * 85).toFixed(1) + '%',
     tip: t.name + ': ' + st(t).eng[0] + '% this week, ' + st(t).eng[1] + '% last week',
+    tap: () => app.toast(t.name + ': ' + st(t).eng[0] + '% engagement this week, ' + st(t).eng[1] + '% last week.'),
   }));
 
   // AI talent rows
