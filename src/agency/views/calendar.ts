@@ -319,6 +319,9 @@ export function overlaysView(app: AgencyApp) {
     };
   }
 
+  // The name a screen reader says for the dialog.
+  ovl.label = kind === 'connect' ? ovl.c.title : kind === 'schedule' ? ovl.sc.title : kind === 'delAcct' ? ovl.da.title
+    : kind === 'delete' ? 'Delete ' + (ovl.d.name || 'this AI talent') + '?' : kind === 'dismiss' ? 'Dismiss this idea?' : kind === 'flag' ? 'This looks wrong' : '';
   return { ovl };
 }
 

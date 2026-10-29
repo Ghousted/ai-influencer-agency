@@ -1,7 +1,7 @@
 // Generated from the Claude Design file "AI Influencer Agency.dc.html".
 // Markup and inline styles are kept as designed; values come from the view model `v`.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
@@ -13,13 +13,45 @@ export function OverlaysScreen({ v }: { v: any }) {
   return createPortal(<OverlaysBody v={v} />, document.body);
 }
 
+/**
+ * A dialog: focus moves into it and back to the button that opened it, Tab stays inside it, and the
+ * page behind does not scroll. Escape and a click outside close it (AgencyApp, the backdrop).
+ */
+function useDialog(ref: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const box = ref.current;
+    const focusables = () => [...(box?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),textarea,select,[href],[tabindex]:not([tabindex="-1"])') || [])].filter((e) => e.offsetParent);
+    // The first field, or else the first button (the close button) gets the focus.
+    (focusables().find((e) => e.matches('input,textarea,select')) || focusables()[0])?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const f = focusables();
+      if (!f.length) return;
+      const i = f.indexOf(document.activeElement as HTMLElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+    };
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+      opener?.focus?.();
+    };
+  }, [ref]);
+}
+
 function OverlaysBody({ v }: { v: any }) {
   const { ovl } = v;
+  const ref = useRef<HTMLDivElement>(null);
+  useDialog(ref);
   return (
     <>
       {(ovl.show) ? (
         <>
-        <div style={{ position: "fixed", inset: "0", zIndex: "50", display: "flex" }}>
+        <div ref={ref} role="dialog" aria-modal="true" aria-label={ovl.label} style={{ position: "fixed", inset: "0", zIndex: "50", display: "flex" }}>
           <div style={{ position: "absolute", inset: "0", background: "rgba(6,14,31,.45)" }} onClick={ovl.close} />
           {(ovl.isConnect) ? (
             <>
@@ -33,7 +65,7 @@ function OverlaysBody({ v }: { v: any }) {
                     For {ovl.c.talent}
                   </div>
                 </div>
-                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close}>
+                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close} aria-label="Close">
                   ×
                 </button>
               </div>
@@ -166,7 +198,7 @@ function OverlaysBody({ v }: { v: any }) {
                 <div style={{ font: "800 20px 'Plus Jakarta Sans',sans-serif" }}>
                   {ovl.sc.title}
                 </div>
-                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close}>
+                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close} aria-label="Close">
                   ×
                 </button>
               </div>
@@ -271,7 +303,7 @@ function OverlaysBody({ v }: { v: any }) {
                 <div style={{ font: "800 20px 'Plus Jakarta Sans',sans-serif" }}>
                   Dismiss this idea?
                 </div>
-                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close}>
+                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close} aria-label="Close">
                   ×
                 </button>
               </div>
@@ -329,7 +361,7 @@ function OverlaysBody({ v }: { v: any }) {
                 <div style={{ font: "800 20px 'Plus Jakarta Sans',sans-serif" }}>
                   This looks wrong
                 </div>
-                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close}>
+                <button style={{ width: "34px", height: "34px", borderRadius: "9999px", border: "none", background: "#F4F4F5", font: "700 16px 'Plus Jakarta Sans',sans-serif", cursor: "pointer", color: "#3f3f46" }} onClick={ovl.close} aria-label="Close">
                   ×
                 </button>
               </div>
