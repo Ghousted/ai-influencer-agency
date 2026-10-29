@@ -26,15 +26,17 @@ async function loadProfile(userId: string, email: string): Promise<Result<Profil
   return { ok: true, data: { userId, email, name: data.owner_name, agencyName: data.name, draft: data.draft, settings: data.settings || {} } };
 }
 
-/** The signed-in student, if a session is saved in this browser. */
-export async function currentProfile(): Promise<Profile | null> {
+/**
+ * The signed-in student, if a session is saved in this browser. `data` is null when there is no session;
+ * a failed load is an error, so the app can say so instead of showing the start page.
+ */
+export async function currentProfile(): Promise<Result<Profile | null>> {
   const sb = supabase();
-  if (!sb) return null;
+  if (!sb) return { ok: true, data: null };
   const { data } = await sb.auth.getSession();
   const u = data.session?.user;
-  if (!u) return null;
-  const p = await loadProfile(u.id, u.email || '');
-  return p.ok ? p.data : null;
+  if (!u) return { ok: true, data: null };
+  return loadProfile(u.id, u.email || '');
 }
 
 export async function signUp(input: { name: string; email: string; password: string; agency: string }): Promise<Result<Profile | 'confirm'>> {

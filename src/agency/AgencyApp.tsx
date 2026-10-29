@@ -241,9 +241,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
       this._hydrated = true;
       this.login();
     } else if (supabase()) {
-      backend.currentProfile().then((p) => {
+      backend.currentProfile().then((r) => {
         this._hydrated = true;
-        if (p) this.enterCloud(p);
+        if (!r.ok) { this.setState({ route: 'login', authErr: r.error + ' Log in again to retry.' }); return; }
+        if (r.data) this.enterCloud(r.data);
       });
     } else {
       const saved = loadState(PERSISTED);
@@ -616,7 +617,10 @@ export class AgencyApp extends Component<AppProps, AppState> {
   /** Home "Try again": reload the agency from the database, or rerun the demo load. */
   retryHome() {
     if (!this.state.cloud) { this.runJob('home'); return; }
-    backend.currentProfile().then((p) => (p ? this.enterCloud(p) : this.logOut(false)));
+    backend.currentProfile().then((r) => {
+      if (!r.ok) { this.toast(r.error); return; }
+      if (r.data) this.enterCloud(r.data); else this.logOut(false);
+    });
   }
 
   async submitLogin() {
