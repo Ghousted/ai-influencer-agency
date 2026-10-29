@@ -7,6 +7,7 @@ import { cryptoConfigured } from './crypto';
 import { platformFetch, redirectUri } from './login-common';
 import { supabaseConfigured } from './supabase';
 import { loadToken, saveToken } from './tokens';
+import { engagement } from './engagement';
 
 const GRAPH = 'https://graph.facebook.com/v26.0';
 const DAY = 86400000;
@@ -100,9 +101,9 @@ export async function readFacebook(userId: string, ref: string): Promise<Account
   const week = (from: number, to: number) => {
     const ps = recent.filter((p) => p.at > from && p.at <= to);
     const views = ps.reduce((n, p) => n + (byId.get(p.id)?.views || 0), 0);
-    const acts = ps.reduce((n, p) => n + (p.reactions?.summary?.total_count || 0) + (p.comments?.summary?.total_count || 0) + (p.shares?.count || 0), 0);
+    const eng = engagement(ps.map((p) => ({ views: byId.get(p.id)?.views || 0, likes: p.reactions?.summary?.total_count || 0, comments: p.comments?.summary?.total_count || 0, shares: p.shares?.count || 0 })));
     const hours = ps.reduce((n, p) => n + (byId.get(p.id)?.ms || 0), 0) / 3600000;
-    return { posts: ps.length, views, eng: views ? Math.round((acts / views) * 1000) / 10 : 0, time: Math.round(hours * 10) / 10 };
+    return { posts: ps.length, views, eng, time: Math.round(hours * 10) / 10 };
   };
   const a = week(now - 7 * DAY, now);
   const b = week(now - 14 * DAY, now - 7 * DAY);

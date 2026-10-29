@@ -248,7 +248,7 @@ export function metricCards(t: Talent) {
     const [a, b] = arr;
     let d: string, up: boolean;
     if (kind === 'count') { const x = a - b; up = x >= 0; d = Math.abs(x) + (up ? ' more' : ' fewer') + ' than last week'; }
-    else if (kind === 'pts') { const x = Math.round((a - b) * 10) / 10; up = x >= 0; d = Math.abs(x) + (up ? '% more' : '% less') + ' than last week'; }
+    else if (kind === 'pts') { const x = Math.round((a - b) * 10) / 10; up = x >= 0; d = Math.abs(x) + (up ? ' points more' : ' points less') + ' than last week'; }
     else if (!b) {
       // Nothing last week: a percent change has no meaning.
       if (!a) return { label, value: fmt(a) + (unit || ''), na: false, notNa: true, sub: 'None last week either', hasDelta: false, color: '#71717a', rot: 'none', delta: '', chip: '#F4F4F5' };

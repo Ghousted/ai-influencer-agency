@@ -6,6 +6,7 @@ import { cryptoConfigured } from './crypto';
 import { platformFetch, redirectUri } from './login-common';
 import { supabaseConfigured } from './supabase';
 import { loadToken, saveToken } from './tokens';
+import { engagement } from './engagement';
 
 const API = 'https://open.tiktokapis.com/v2';
 const DAY = 86400000;
@@ -126,8 +127,8 @@ export async function readTiktok(userId: string, ref: string): Promise<AccountRe
   const week = (from: number, to: number) => {
     const ws = recent.filter((v) => v.at > from && v.at <= to);
     const views = ws.reduce((n, v) => n + (v.view_count || 0), 0);
-    const acts = ws.reduce((n, v) => n + (v.like_count || 0) + (v.comment_count || 0) + (v.share_count || 0), 0);
-    return { posts: ws.length, views, eng: views ? Math.round((acts / views) * 1000) / 10 : 0 };
+    const eng = engagement(ws.map((v) => ({ views: v.view_count || 0, likes: v.like_count || 0, comments: v.comment_count || 0, shares: v.share_count || 0 })));
+    return { posts: ws.length, views, eng };
   };
   const a = week(now - 7 * DAY, now);
   const b = week(now - 14 * DAY, now - 7 * DAY);

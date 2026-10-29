@@ -2,6 +2,7 @@
 // Public numbers only, found by handle, so there is no sign-in and no app review.
 // YouTube does not share watch time without the owner's sign-in, so `time` is always null.
 import { ABOUT_POSTS, AccountError, topPosts, type AccountAbout, type AccountRead } from './account-error';
+import { engagement } from './engagement';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const TIMEOUT_MS = 15000;
@@ -84,8 +85,8 @@ export async function readYoutube({ handle, ref }: { handle?: string; ref?: stri
   const week = (from: number, to: number) => {
     const vs = recent.filter((v) => v.at > from && v.at <= to).map((v) => stats.get(v.id) || {});
     const views = vs.reduce((n, s) => n + Number(s.viewCount || 0), 0);
-    const acts = vs.reduce((n, s) => n + Number(s.likeCount || 0) + Number(s.commentCount || 0), 0);
-    return { posts: vs.length, views, eng: views ? Math.round((acts / views) * 1000) / 10 : 0 };
+    const eng = engagement(vs.map((s) => ({ views: Number(s.viewCount || 0), likes: Number(s.likeCount || 0), comments: Number(s.commentCount || 0) })));
+    return { posts: vs.length, views, eng };
   };
   const a = week(now - 7 * DAY, now);
   const b = week(now - 14 * DAY, now - 7 * DAY);

@@ -6,6 +6,7 @@ import { cryptoConfigured } from './crypto';
 import { platformFetch, redirectUri } from './login-common';
 import { supabaseConfigured } from './supabase';
 import { loadToken, saveToken } from './tokens';
+import { engagement } from './engagement';
 
 const HOST = 'https://graph.instagram.com';
 const GRAPH = `${HOST}/v26.0`;
@@ -136,8 +137,8 @@ export async function readInstagram(userId: string, ref: string): Promise<Accoun
   const week = (from: number, to: number) => {
     const ms = recent.filter((m) => m.at > from && m.at <= to);
     const v = ms.reduce((n, m) => n + (views.get(m.id) || 0), 0);
-    const acts = ms.reduce((n, m) => n + (m.like_count || 0) + (m.comments_count || 0), 0);
-    return { posts: ms.length, views: v, eng: v ? Math.round((acts / v) * 1000) / 10 : 0 };
+    const eng = engagement(ms.map((m) => ({ views: views.get(m.id) || 0, likes: m.like_count || 0, comments: m.comments_count || 0, ...extra.get(m.id) })));
+    return { posts: ms.length, views: v, eng };
   };
   const a = week(now - 7 * DAY, now);
   const b = week(now - 14 * DAY, now - 7 * DAY);
@@ -152,7 +153,7 @@ export async function readInstagram(userId: string, ref: string): Promise<Accoun
       text: m.caption,
       format: m.media_product_type === 'REELS' ? 'Reel' : FORMAT[m.media_type || ''] || 'Post',
       views: views.get(m.id) || 0,
-      acts: (m.like_count || 0) + (m.comments_count || 0),
+      acts: (m.like_count || 0) + (m.comments_count || 0) + (extra.get(m.id)?.shares || 0) + (extra.get(m.id)?.saves || 0),
       url: m.permalink,
     }))),
     recent: recent.map((m) => ({
