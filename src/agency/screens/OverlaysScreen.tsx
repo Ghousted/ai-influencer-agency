@@ -16,9 +16,11 @@ export function OverlaysScreen({ v }: { v: any }) {
 /**
  * A dialog: focus moves into it and back to the button that opened it, Tab stays inside it, and the
  * page behind does not scroll. Escape and a click outside close it (AgencyApp, the backdrop).
+ * It runs only while a dialog shows, so the page never stays locked when this component stays mounted.
  */
-function useDialog(ref: React.RefObject<HTMLDivElement | null>) {
+function useDialog(ref: React.RefObject<HTMLDivElement | null>, show: boolean) {
   useEffect(() => {
+    if (!show || !ref.current) return;
     const opener = document.activeElement as HTMLElement | null;
     const box = ref.current;
     const focusables = () => [...(box?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),textarea,select,[href],[tabindex]:not([tabindex="-1"])') || [])].filter((e) => e.offsetParent);
@@ -40,13 +42,13 @@ function useDialog(ref: React.RefObject<HTMLDivElement | null>) {
       document.body.style.overflow = overflow;
       opener?.focus?.();
     };
-  }, [ref]);
+  }, [ref, show]);
 }
 
 function OverlaysBody({ v }: { v: any }) {
   const { ovl } = v;
   const ref = useRef<HTMLDivElement>(null);
-  useDialog(ref);
+  useDialog(ref, !!ovl.show);
   return (
     <>
       {(ovl.show) ? (
