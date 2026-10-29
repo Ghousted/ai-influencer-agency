@@ -149,7 +149,7 @@ export function HomeScreen({ v }: { v: any }) {
                         {(home.ticks || []).map((tk: any, tk_i: number) => (
                           <Fragment key={tk_i}>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", height: "0" }}>
-                              <span style={{ width: "36px", textAlign: "right", font: "500 11px 'Plus Jakarta Sans',sans-serif", color: "#a1a1aa" }}>
+                              <span style={{ width: "36px", textAlign: "right", font: "500 11px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
                                 {tk}
                               </span>
                               <span style={{ flex: "1", height: "1px", background: "#F1F1F3" }} />
@@ -275,7 +275,7 @@ export function HomeScreen({ v }: { v: any }) {
                 </div>
                 </>
               ) : null}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: "20px", alignItems: "stretch" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: "20px", alignItems: "stretch" }}>
                 <div style={{ background: "#fff", borderRadius: "20px", padding: "20px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "4px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                     <h2 style={{ margin: "0", font: "800 16px 'Plus Jakarta Sans',sans-serif" }}>

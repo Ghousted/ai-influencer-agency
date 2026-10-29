@@ -135,6 +135,14 @@ export class AgencyApp extends Component<AppProps, AppState> {
     this._waitingMem = w;
     try { if (w) sessionStorage.setItem(WAITING_KEY, JSON.stringify(w)); else sessionStorage.removeItem(WAITING_KEY); } catch { /* storage blocked */ }
   }
+  /** A click outside the account menu closes it. */
+  private _onDown = (e: MouseEvent) => {
+    if (!this.state.acctMenu) return;
+    const t = e.target as Element | null;
+    if (t?.closest?.('.aia-acct, .aia-acct-menu')) return;
+    this.setState({ acctMenu: false });
+  };
+
   private _onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.state.ov) this.setState({ ov: null });
@@ -190,6 +198,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
       if (n !== !!this.state.narrow) this.setState({ narrow: n });
     };
     addEventListener('resize', this._nr);
+    addEventListener('mousedown', this._onDown);
     addEventListener('keydown', this._onKey);
     try { this._restore = (window.history.state as { aia?: Nav } | null)?.aia || null; } catch { /* not in a browser */ }
     addEventListener('popstate', this._onPop);
@@ -272,6 +281,7 @@ export class AgencyApp extends Component<AppProps, AppState> {
   componentWillUnmount() {
     removeEventListener('popstate', this._onPop);
     if (this._nr) removeEventListener('resize', this._nr);
+    removeEventListener('mousedown', this._onDown);
     removeEventListener('keydown', this._onKey);
     removeEventListener('visibilitychange', this._onHide);
     removeEventListener('beforeunload', this._onUnload);

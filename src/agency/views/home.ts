@@ -153,7 +153,7 @@ export function homeView(app: AgencyApp) {
     ring: on ? colorOf(t) : '#D4D4D8',
     bg: on ? '#fff' : '#F4F4F5',
     bd: on ? '#E4E4E7' : 'transparent',
-    fg: on ? '#18181b' : '#A1A1AA',
+    fg: on ? '#18181b' : '#71717a',
     filter: on ? 'none' : 'grayscale(1) opacity(.6)',
     tip: (on ? 'Hide ' : 'Show ') + first(t) + "'s line",
     toggle: () => toggle(t.id),

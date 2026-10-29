@@ -149,7 +149,7 @@ function formView(app: AgencyApp) {
       bg: cur ? '#006AFF' : done ? '#EAF2FF' : '#F4F4F5',
       fg: cur ? '#fff' : done ? '#006AFF' : '#A1A1AA',
       ring: cur ? '0 0 0 4px rgba(0,106,255,.15)' : 'none',
-      labelC: cur || done ? '#18181b' : '#A1A1AA',
+      labelC: cur || done ? '#18181b' : '#71717a',
       hasLine: n < 4,
       line: done ? '#006AFF' : '#E4E4E7',
       locked,

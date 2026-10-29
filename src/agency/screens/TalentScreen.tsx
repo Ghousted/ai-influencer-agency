@@ -188,7 +188,7 @@ export function TalentScreen({ v }: { v: any }) {
                         {(cur.an.ticks || []).map((tk: any, tk_i: number) => (
                           <Fragment key={tk_i}>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", height: "0" }}>
-                              <span style={{ width: "36px", textAlign: "right", font: "500 11px 'Plus Jakarta Sans',sans-serif", color: "#a1a1aa" }}>
+                              <span style={{ width: "36px", textAlign: "right", font: "500 11px 'Plus Jakarta Sans',sans-serif", color: "#71717a" }}>
                                 {tk}
                               </span>
                               <span style={{ flex: "1", height: "1px", background: "#F1F1F3" }} />
@@ -853,7 +853,7 @@ export function TalentScreen({ v }: { v: any }) {
                       </>
                     ) : null}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: "16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(300px,100%),1fr))", gap: "16px" }}>
                     <div style={{ height: "200px", borderRadius: "18px", background: "#E4E4E7", animation: "aia-pulse 1.4s ease-in-out infinite" }} />
                     <div style={{ height: "200px", borderRadius: "18px", background: "#E4E4E7", animation: "aia-pulse 1.4s ease-in-out infinite" }} />
                     <div style={{ height: "200px", borderRadius: "18px", background: "#E4E4E7", animation: "aia-pulse 1.4s ease-in-out infinite" }} />
@@ -890,7 +890,7 @@ export function TalentScreen({ v }: { v: any }) {
               ) : null}
               {(cur.scout.ready) ? (
                 <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: "16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(300px,100%),1fr))", gap: "16px" }}>
                   {(cur.scout.brands || []).map((b: any, b_i: number) => (
                     <Fragment key={b_i}>
                       <div style={{ background: "#fff", borderRadius: "18px", padding: "20px", border: "1px solid #E4E4E7", boxShadow: "0 1px 2px rgba(0,0,0,.05)", display: "flex", flexDirection: "column", gap: "12px", animation: "aia-in .25s ease-out" }}>

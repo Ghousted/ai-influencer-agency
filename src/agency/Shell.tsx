@@ -41,7 +41,7 @@ export function Shell({ v, children }: { v: any; children: ReactNode }) {
                   </svg>
                 </button>
                 {acctMenu ? (
-                  <div style={{ position: 'absolute', right: '0', top: '48px', width: '250px', background: '#fff', color: '#18181b', borderRadius: '16px', boxShadow: '0 8px 30px rgba(24,24,27,.18)', padding: '8px', display: 'flex', flexDirection: 'column', animation: 'aia-in .15s ease-out' }}>
+                  <div className="aia-acct-menu" style={{ position: 'absolute', right: '0', top: '48px', width: '250px', background: '#fff', color: '#18181b', borderRadius: '16px', boxShadow: '0 8px 30px rgba(24,24,27,.18)', padding: '8px', display: 'flex', flexDirection: 'column', animation: 'aia-in .15s ease-out' }}>
                     <div style={{ padding: '10px 12px 12px' }}>
                       <div style={{ font: "700 14px 'Plus Jakarta Sans',sans-serif" }}>{userName}</div>
                       <div style={{ font: "500 13px 'Plus Jakarta Sans',sans-serif", color: '#71717a' }}>{userEmail}</div>
